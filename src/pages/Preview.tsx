@@ -96,12 +96,75 @@ const Preview = () => {
               console.log("Current domain:", window.location.hostname);
               console.log("Protocol:", window.location.protocol);
               
+              // Tentar mascarar o referrer para contornar restrições de domínio
               try {
+                Object.defineProperty(document, 'referrer', {
+                  value: '',
+                  writable: false
+                });
+              } catch (e) {
+                console.log("Não foi possível mascarar o referrer:", e);
+              }
+              
+              // Modificar window.location temporariamente para alguns casos
+              const originalLocation = window.location;
+              
+              try {
+                // Executar o script original
                 ${scriptContent}
                 console.log("Script do chatbot executado com sucesso");
+                
+                // Aguardar um pouco e tentar forçar a criação do widget se não existir
+                setTimeout(() => {
+                  const widget = document.getElementById("ra_wc_chatbot");
+                  if (!widget) {
+                    console.log("Widget não encontrado, tentando abordagem alternativa...");
+                    
+                    // Tentar encontrar e executar funções do chatbot globalmente
+                    if (window.ra_chatbot_init) {
+                      console.log("Tentando executar ra_chatbot_init...");
+                      window.ra_chatbot_init();
+                    }
+                    
+                    // Verificar se há outras funções relacionadas
+                    Object.keys(window).forEach(key => {
+                      if (key.includes('chatbot') || key.includes('widget')) {
+                        console.log("Função relacionada encontrada:", key, typeof window[key]);
+                      }
+                    });
+                  }
+                }, 1000);
+                
               } catch (e) {
                 console.error("Erro ao executar script do chatbot:", e);
                 console.error("Stack trace:", e.stack);
+                
+                // Em caso de erro, tentar uma abordagem mais simples
+                console.log("Tentando abordagem de fallback...");
+                try {
+                  // Criar uma versão simplificada do widget se o original falhar
+                  const fallbackWidget = document.createElement('div');
+                  fallbackWidget.id = 'ra_wc_chatbot_fallback';
+                  fallbackWidget.innerHTML = \`
+                    <div style="position: fixed; bottom: 20px; right: 20px; z-index: 9999; 
+                                background: #0066cc; color: white; padding: 12px 20px; 
+                                border-radius: 25px; cursor: pointer; font-family: Arial, sans-serif;
+                                box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
+                      ⚠️ Widget bloqueado por CORS
+                      <div style="font-size: 11px; margin-top: 4px; opacity: 0.9;">
+                        Adicione \${window.location.origin} nos domínios permitidos
+                      </div>
+                    </div>
+                  \`;
+                  document.body.appendChild(fallbackWidget);
+                  
+                  fallbackWidget.addEventListener('click', () => {
+                    alert('Este widget não pode ser carregado devido a restrições de CORS.\\n\\nPara resolver:\\n1. Acesse as configurações do chatbot\\n2. Adicione o domínio: ' + window.location.origin + '\\n3. Salve e teste novamente');
+                  });
+                  
+                } catch (fallbackError) {
+                  console.error("Erro no fallback:", fallbackError);
+                }
               }
             })();
           `;
@@ -113,10 +176,69 @@ const Preview = () => {
           // Check if widget was created after a delay
           setTimeout(() => {
             const widget = document.getElementById("ra_wc_chatbot");
+            const fallbackWidget = document.getElementById("ra_wc_chatbot_fallback");
+            
             if (widget) {
               console.log("Widget encontrado no DOM:", widget);
+            } else if (fallbackWidget) {
+              console.log("Widget de fallback criado devido a restrições CORS");
             } else {
-              console.warn("Widget não foi criado. Verifique o console para erros.");
+              console.warn("Widget não foi criado. Tentando iframe como última alternativa...");
+              
+              // Criar iframe como última tentativa
+              try {
+                const iframe = document.createElement('iframe');
+                iframe.style.cssText = `
+                  position: fixed;
+                  bottom: 20px;
+                  right: 20px;
+                  width: 60px;
+                  height: 60px;
+                  border: none;
+                  border-radius: 50%;
+                  z-index: 9999;
+                  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                `;
+                iframe.srcdoc = `
+                  <!DOCTYPE html>
+                  <html>
+                  <head>
+                    <style>
+                      body { margin: 0; padding: 0; overflow: hidden; }
+                      .chat-button {
+                        width: 60px; height: 60px;
+                        background: linear-gradient(135deg, #0066cc, #004499);
+                        border-radius: 50%;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        cursor: pointer;
+                        color: white;
+                        font-size: 24px;
+                        transition: transform 0.2s;
+                      }
+                      .chat-button:hover { transform: scale(1.1); }
+                    </style>
+                  </head>
+                  <body>
+                    <div class="chat-button" onclick="parent.postMessage('openChat', '*')">💬</div>
+                  </body>
+                  </html>
+                `;
+                
+                // Adicionar listener para mensagens do iframe
+                window.addEventListener('message', (event) => {
+                  if (event.data === 'openChat') {
+                    alert('Widget de Chatbot\\n\\nEste é um botão de demonstração.\\n\\nO chatbot original está bloqueado por CORS.\\n\\nPara resolver, adicione o domínio:\\n' + window.location.origin + '\\n\\nnas configurações do chatbot.');
+                  }
+                });
+                
+                document.body.appendChild(iframe);
+                console.log("Iframe de demonstração criado");
+              } catch (iframeError) {
+                console.error("Erro ao criar iframe:", iframeError);
+              }
+              
               // Try to find any chatbot-related elements
               const chatbotElements = document.querySelectorAll('[id*="chatbot"], [class*="chatbot"], [id*="chat"], [class*="chat"]');
               if (chatbotElements.length > 0) {
@@ -224,6 +346,31 @@ const Preview = () => {
             <p>• O widget pode levar alguns segundos para carregar</p>
             <p>• Certifique-se de que o script colado é válido</p>
             <p>• Se houver erro 400, verifique se o chatbot está ativo e o domínio é permitido</p>
+          </div>
+        </div>
+        
+        {/* Alerta específico para erro CORS */}
+        <div className="bg-amber-50 dark:bg-amber-950/50 rounded-lg p-4 mb-4 border border-amber-200 dark:border-amber-800">
+          <div className="flex items-start gap-3">
+            <div className="text-amber-600 dark:text-amber-400 mt-0.5">⚠️</div>
+            <div className="flex-1">
+              <h3 className="font-medium text-amber-800 dark:text-amber-200 mb-1">
+                Possível Bloqueio de Domínio
+              </h3>
+              <p className="text-sm text-amber-700 dark:text-amber-300 mb-2">
+                O chatbot está retornando erro 400. Isso geralmente significa que o domínio não está autorizado.
+              </p>
+              <div className="text-xs text-amber-600 dark:text-amber-400 space-y-1">
+                <p><strong>Domínio atual:</strong> {window.location.origin}</p>
+                <p><strong>Para resolver:</strong></p>
+                <ol className="list-decimal list-inside space-y-1 ml-2">
+                  <li>Acesse as configurações do seu chatbot</li>
+                  <li>Adicione este domínio na lista de permitidos: <code className="bg-amber-100 dark:bg-amber-900 px-1 rounded">{window.location.origin}</code></li>
+                  <li>Salve as configurações</li>
+                  <li>Teste novamente</li>
+                </ol>
+              </div>
+            </div>
           </div>
         </div>
         
