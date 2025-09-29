@@ -62,15 +62,46 @@ const Preview = () => {
           scriptElement.type = "text/javascript";
           scriptElement.setAttribute("data-chatbot-injected", "true");
           
+          // Monitor network requests to help debug 400 errors
+          const originalFetch = window.fetch;
+          window.fetch = function(...args) {
+            console.log("Fetch request:", args[0]);
+            return originalFetch.apply(this, args).catch(err => {
+              console.error("Fetch error:", err);
+              return Promise.reject(err);
+            });
+          };
+          
+          // Override XMLHttpRequest to monitor older AJAX requests
+          const originalXHR = window.XMLHttpRequest.prototype.open;
+          window.XMLHttpRequest.prototype.open = function(method, url, ...rest) {
+            console.log("XHR request:", method, url);
+            this.addEventListener('error', (e) => {
+              console.error("XHR error:", e, "URL:", url);
+            });
+            this.addEventListener('load', () => {
+              if (this.status >= 400) {
+                console.error("XHR HTTP error:", this.status, this.statusText, "URL:", url);
+                console.error("Response:", this.responseText);
+              }
+            });
+            return originalXHR.call(this, method, url, ...rest);
+          };
+          
           // Wrap the script content to ensure it runs in the correct context
           scriptElement.text = `
             (function() {
               console.log("Executando script do chatbot...");
+              console.log("User Agent:", navigator.userAgent);
+              console.log("Current domain:", window.location.hostname);
+              console.log("Protocol:", window.location.protocol);
+              
               try {
                 ${scriptContent}
                 console.log("Script do chatbot executado com sucesso");
               } catch (e) {
                 console.error("Erro ao executar script do chatbot:", e);
+                console.error("Stack trace:", e.stack);
               }
             })();
           `;
@@ -86,9 +117,14 @@ const Preview = () => {
               console.log("Widget encontrado no DOM:", widget);
             } else {
               console.warn("Widget não foi criado. Verifique o console para erros.");
+              // Try to find any chatbot-related elements
+              const chatbotElements = document.querySelectorAll('[id*="chatbot"], [class*="chatbot"], [id*="chat"], [class*="chat"]');
+              if (chatbotElements.length > 0) {
+                console.log("Elementos relacionados ao chatbot encontrados:", chatbotElements);
+              }
             }
             setIsLoading(false);
-          }, 2000);
+          }, 3000);
 
           // Cleanup function
           return () => {
@@ -187,7 +223,23 @@ const Preview = () => {
             <p>• Verifique o console do navegador (F12) para logs de debug</p>
             <p>• O widget pode levar alguns segundos para carregar</p>
             <p>• Certifique-se de que o script colado é válido</p>
+            <p>• Se houver erro 400, verifique se o chatbot está ativo e o domínio é permitido</p>
           </div>
+        </div>
+        
+        {/* Debug info panel */}
+        <div className="bg-card/30 rounded-lg p-4 mb-4 border border-border/30">
+          <details className="text-sm">
+            <summary className="cursor-pointer font-medium text-foreground mb-2">
+              Informações de Debug
+            </summary>
+            <div className="text-xs text-muted-foreground space-y-1 mt-2">
+              <p><strong>Domínio atual:</strong> {window.location.hostname}</p>
+              <p><strong>Protocolo:</strong> {window.location.protocol}</p>
+              <p><strong>URL completa:</strong> {window.location.href}</p>
+              <p><strong>User Agent:</strong> {navigator.userAgent.substring(0, 100)}...</p>
+            </div>
+          </details>
         </div>
       </div>
     </div>

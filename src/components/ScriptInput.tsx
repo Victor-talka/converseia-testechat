@@ -75,6 +75,15 @@ const ScriptInput = () => {
             <Sparkles className="w-4 h-4 text-primary" />
             Script do Chatbot
           </label>
+          <div className="text-xs text-muted-foreground mb-2 p-3 bg-blue-50 dark:bg-blue-950/50 rounded-lg border border-blue-200 dark:border-blue-800">
+            <p className="font-medium mb-1">💡 Dicas importantes:</p>
+            <ul className="space-y-1">
+              <li>• Certifique-se de que o chatbot está ativo na plataforma</li>
+              <li>• Verifique se o domínio está autorizado nas configurações</li>
+              <li>• O widget pode demorar alguns segundos para aparecer</li>
+              <li>• Use F12 para verificar o console em caso de erros</li>
+            </ul>
+          </div>
           <Textarea
             value={script}
             onChange={(e) => setScript(e.target.value)}
