@@ -51,32 +51,77 @@ const Preview = () => {
         return;
       }
 
-      // Create and inject the script element directly into the DOM
-      const scriptElement = document.createElement("script");
-      scriptElement.type = "text/javascript";
-      scriptElement.text = scriptContent;
-      
-      // Add script to document
-      document.body.appendChild(scriptElement);
-      
-      // Give it a moment to initialize
-      setTimeout(() => {
-        setIsLoading(false);
-      }, 1500);
+      console.log("Script encontrado, preparando para injetar...");
+      console.log("Conteúdo do script:", scriptContent.substring(0, 200) + "...");
 
-      // Cleanup function
-      return () => {
-        // Remove the script element
-        if (scriptElement.parentNode) {
-          scriptElement.parentNode.removeChild(scriptElement);
-        }
-        
-        // Remove the chatbot widget if it exists
-        const widget = document.getElementById("ra_wc_chatbot");
-        if (widget && widget.parentNode) {
-          widget.parentNode.removeChild(widget);
+      // Wait for DOM to be fully ready
+      const injectScript = () => {
+        try {
+          // Create and inject the script element directly into the DOM
+          const scriptElement = document.createElement("script");
+          scriptElement.type = "text/javascript";
+          scriptElement.setAttribute("data-chatbot-injected", "true");
+          
+          // Wrap the script content to ensure it runs in the correct context
+          scriptElement.text = `
+            (function() {
+              console.log("Executando script do chatbot...");
+              try {
+                ${scriptContent}
+                console.log("Script do chatbot executado com sucesso");
+              } catch (e) {
+                console.error("Erro ao executar script do chatbot:", e);
+              }
+            })();
+          `;
+          
+          // Add script to document head for better compatibility
+          document.head.appendChild(scriptElement);
+          console.log("Script injetado no DOM");
+          
+          // Check if widget was created after a delay
+          setTimeout(() => {
+            const widget = document.getElementById("ra_wc_chatbot");
+            if (widget) {
+              console.log("Widget encontrado no DOM:", widget);
+            } else {
+              console.warn("Widget não foi criado. Verifique o console para erros.");
+            }
+            setIsLoading(false);
+          }, 2000);
+
+          // Cleanup function
+          return () => {
+            console.log("Limpando script e widget...");
+            // Remove the script element
+            if (scriptElement.parentNode) {
+              scriptElement.parentNode.removeChild(scriptElement);
+            }
+            
+            // Remove the chatbot widget if it exists
+            const widget = document.getElementById("ra_wc_chatbot");
+            if (widget && widget.parentNode) {
+              widget.parentNode.removeChild(widget);
+            }
+            
+            // Remove any additional scripts that may have been loaded
+            const injectedScripts = document.querySelectorAll('script[id^="ra_chatbot"]');
+            injectedScripts.forEach(script => {
+              if (script.parentNode) {
+                script.parentNode.removeChild(script);
+              }
+            });
+          };
+        } catch (err) {
+          console.error("Erro ao injetar script:", err);
+          setError(`Erro ao injetar o script: ${err instanceof Error ? err.message : "Erro desconhecido"}`);
+          setIsLoading(false);
         }
       };
+
+      // Execute after a short delay to ensure DOM is ready
+      const cleanup = injectScript();
+      return cleanup;
     } catch (err) {
       console.error("Error loading chatbot script:", err);
       setError(`Erro ao carregar o chatbot: ${err instanceof Error ? err.message : "Erro desconhecido"}`);
@@ -131,13 +176,18 @@ const Preview = () => {
   }
 
   return (
-    <div className="min-h-screen p-4">
+    <div className="min-h-screen p-4" style={{ position: 'relative', zIndex: 1 }}>
       <div className="max-w-4xl mx-auto">
         <div className="bg-card/50 rounded-lg p-6 mb-4 border border-border/50">
           <h1 className="text-xl font-semibold text-foreground mb-2">Preview do Chatbot</h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-muted-foreground mb-4">
             O widget deve aparecer no canto inferior direito da tela
           </p>
+          <div className="text-xs text-muted-foreground space-y-1">
+            <p>• Verifique o console do navegador (F12) para logs de debug</p>
+            <p>• O widget pode levar alguns segundos para carregar</p>
+            <p>• Certifique-se de que o script colado é válido</p>
+          </div>
         </div>
       </div>
     </div>
