@@ -1,62 +1,144 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
+import { AlertCircle } from "lucide-react";
 
 const Preview = () => {
   const { id } = useParams();
+  const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!id) return;
+    if (!id) {
+      setError("ID do preview não encontrado");
+      setIsLoading(false);
+      return;
+    }
 
     const storedScripts = localStorage.getItem("chatbot-scripts");
-    if (!storedScripts) return;
+    if (!storedScripts) {
+      setError("Nenhum script encontrado. Por favor, gere um novo preview.");
+      setIsLoading(false);
+      return;
+    }
 
     try {
       const scripts = JSON.parse(storedScripts);
       const scriptData = scripts[id];
       
       if (!scriptData) {
-        console.error("Script not found for ID:", id);
+        setError("Script não encontrado para este ID. O link pode estar expirado.");
+        setIsLoading(false);
         return;
       }
 
-      // Create a container for the script to execute in
-      const scriptElement = document.createElement("div");
-      scriptElement.innerHTML = scriptData.script;
+      // Extract script content from the stored script
+      const tempDiv = document.createElement("div");
+      tempDiv.innerHTML = scriptData.script;
       
-      // Extract and execute the script
-      const scriptTags = scriptElement.getElementsByTagName("script");
-      if (scriptTags.length > 0) {
-        const scriptContent = scriptTags[0].textContent || scriptTags[0].innerHTML;
-        
-        // Execute the script in a safe way
-        const executeScript = new Function(scriptContent);
-        executeScript();
+      const scriptTags = tempDiv.getElementsByTagName("script");
+      if (scriptTags.length === 0) {
+        setError("Nenhum script válido encontrado. Verifique o código colado.");
+        setIsLoading(false);
+        return;
       }
-    } catch (error) {
-      console.error("Error loading chatbot script:", error);
+
+      // Get the script content
+      const scriptContent = scriptTags[0].textContent || scriptTags[0].innerHTML;
+      
+      if (!scriptContent.trim()) {
+        setError("Script vazio. Por favor, cole um script válido.");
+        setIsLoading(false);
+        return;
+      }
+
+      // Create and inject the script element directly into the DOM
+      const scriptElement = document.createElement("script");
+      scriptElement.type = "text/javascript";
+      scriptElement.text = scriptContent;
+      
+      // Add script to document
+      document.body.appendChild(scriptElement);
+      
+      // Give it a moment to initialize
+      setTimeout(() => {
+        setIsLoading(false);
+      }, 1500);
+
+      // Cleanup function
+      return () => {
+        // Remove the script element
+        if (scriptElement.parentNode) {
+          scriptElement.parentNode.removeChild(scriptElement);
+        }
+        
+        // Remove the chatbot widget if it exists
+        const widget = document.getElementById("ra_wc_chatbot");
+        if (widget && widget.parentNode) {
+          widget.parentNode.removeChild(widget);
+        }
+      };
+    } catch (err) {
+      console.error("Error loading chatbot script:", err);
+      setError(`Erro ao carregar o chatbot: ${err instanceof Error ? err.message : "Erro desconhecido"}`);
+      setIsLoading(false);
     }
   }, [id]);
 
-  return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <div className="text-center space-y-4">
-        <div className="inline-block p-4 bg-card rounded-full shadow-[var(--shadow-elegant)] mb-4">
-          <svg
-            className="w-8 h-8 text-primary animate-pulse"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="text-center space-y-4 max-w-md">
+          <div className="inline-block p-4 bg-destructive/10 rounded-full mb-4">
+            <AlertCircle className="w-8 h-8 text-destructive" />
+          </div>
+          <h1 className="text-2xl font-bold text-foreground">Erro ao Carregar</h1>
+          <p className="text-muted-foreground">{error}</p>
+          <a
+            href="/"
+            className="inline-block mt-4 text-primary hover:underline"
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
-            />
-          </svg>
+            Voltar para a página inicial
+          </a>
         </div>
-        <h1 className="text-2xl font-bold text-foreground">Carregando Chatbot...</h1>
-        <p className="text-muted-foreground">O widget será exibido em instantes</p>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="text-center space-y-4">
+          <div className="inline-block p-4 bg-card rounded-full shadow-[var(--shadow-elegant)] mb-4">
+            <svg
+              className="w-8 h-8 text-primary animate-pulse"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+              />
+            </svg>
+          </div>
+          <h1 className="text-2xl font-bold text-foreground">Carregando Chatbot...</h1>
+          <p className="text-muted-foreground">O widget será exibido em instantes</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen p-4">
+      <div className="max-w-4xl mx-auto">
+        <div className="bg-card/50 rounded-lg p-6 mb-4 border border-border/50">
+          <h1 className="text-xl font-semibold text-foreground mb-2">Preview do Chatbot</h1>
+          <p className="text-sm text-muted-foreground">
+            O widget deve aparecer no canto inferior direito da tela
+          </p>
+        </div>
       </div>
     </div>
   );
