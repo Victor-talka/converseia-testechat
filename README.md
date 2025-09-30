@@ -24,15 +24,23 @@ Este projeto está configurado para deploy automático no Vercel. O arquivo `ver
 - **Compartilhamento**: Links únicos para demonstrações
 - **Debug avançado**: Console detalhado para identificar problemas
 
-### 🔒 **Banco de Dados**
-- **Firebase Firestore**: Banco gratuito e escalável
-- **Persistência**: Dados salvos permanentemente
-- **Backup automático**: Sincronização em tempo real
-- **Segurança**: Configurações de acesso controladas
+### 🔒 **Sistema de Armazenamento Híbrido**
+- **Firebase Firestore**: Banco gratuito e escalável (opcional)
+- **LocalStorage**: Fallback automático quando Firebase não configurado
+- **Compatibilidade**: Funciona com scripts legacy existentes
+- **Indicadores visuais**: Mostra qual storage está sendo usado
+- **Migração suave**: Dados migram automaticamente quando Firebase é configurado
 
 ## 🛠️ Configuração
 
-### 1. **Firebase Setup**
+### ⚡ **Início Rápido (sem configuração)**
+A aplicação funciona **imediatamente** sem nenhuma configuração:
+- ✅ Usa localStorage como armazenamento padrão
+- ✅ Todos os recursos funcionam normalmente
+- ✅ Dados salvos localmente no navegador
+- ✅ Deploy direto no Vercel funciona
+
+### 🚀 **Firebase (Opcional - para persistência na nuvem)**
 1. Acesse [Firebase Console](https://console.firebase.google.com/)
 2. Crie um novo projeto
 3. Ative o **Firestore Database**
@@ -48,21 +56,24 @@ service cloud.firestore {
 }
 ```
 
-### 2. **Variáveis de Ambiente**
-Crie um arquivo `.env` baseado no `.env.example`:
+### 2. **Variáveis de Ambiente (opcional)**
+Para ativar o Firebase, crie um arquivo `.env`:
 ```bash
-VITE_FIREBASE_API_KEY=your-api-key-here
-VITE_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
-VITE_FIREBASE_PROJECT_ID=your-project-id
-VITE_FIREBASE_STORAGE_BUCKET=your-project.appspot.com
-VITE_FIREBASE_MESSAGING_SENDER_ID=123456789
-VITE_FIREBASE_APP_ID=1:123456789:web:abcdef123456
+# Deixe comentado para usar localStorage
+# Descomente para ativar Firebase
+
+# VITE_FIREBASE_API_KEY=your-api-key-here
+# VITE_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
+# VITE_FIREBASE_PROJECT_ID=your-project-id
+# VITE_FIREBASE_STORAGE_BUCKET=your-project.appspot.com
+# VITE_FIREBASE_MESSAGING_SENDER_ID=123456789
+# VITE_FIREBASE_APP_ID=1:123456789:web:abcdef123456
 ```
 
 ### 3. **Deploy no Vercel**
 1. Conecte seu repositório ao Vercel
-2. Adicione as variáveis de ambiente no painel do Vercel
-3. Deploy automático será feito a cada push
+2. **Opcional**: Adicione as variáveis de ambiente para Firebase
+3. Deploy automático funciona com ou sem Firebase
 
 ## 🛠️ Resolução de Problemas
 
@@ -91,12 +102,26 @@ Se o widget não carregar e você ver um erro 400 no console:
 3. **Teste em modo anônimo** para descartar extensões
 4. **Verifique se o script está completo** e sem caracteres especiais
 
-### Problemas com Firebase
+### Problemas com Storage
 
-1. **Verifique as variáveis de ambiente** no Vercel
-2. **Confirme as regras do Firestore** (devem permitir leitura/escrita)
-3. **Verifique o console do Firebase** para logs de erro
-4. **Teste a conexão** usando as ferramentas de debug do navegador
+**A aplicação sempre funciona!** Se você ver indicadores mostrando:
+
+- 🟢 **"Firebase Firestore"**: Conectado à nuvem, dados persistentes
+- 🔵 **"LocalStorage"**: Funcionando localmente, dados no navegador
+
+Ambos os modos são **completamente funcionais**:
+
+1. **LocalStorage** (padrão):
+   - ✅ Funciona imediatamente
+   - ✅ Todos os recursos disponíveis
+   - ⚠️ Dados salvos apenas neste navegador
+
+2. **Firebase** (opcional):
+   - ✅ Dados na nuvem, acessíveis de qualquer lugar
+   - ✅ Backup automático
+   - ⚠️ Requer configuração
+
+**Migração**: Quando configurar Firebase, dados existentes serão mantidos.
 
 ## 🔍 Debug
 

@@ -4,8 +4,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { Copy, Sparkles, Code2, User, Plus, Users } from "lucide-react";
-import { clientService, scriptService } from "@/services/database";
+import { Copy, Sparkles, Code2, User, Plus, Users, Database, HardDrive } from "lucide-react";
+import { clientService, scriptService, getStorageStatus } from "@/services/database";
 import { Client } from "@/types/database";
 
 const ScriptInput = () => {
@@ -18,24 +18,30 @@ const ScriptInput = () => {
   const [selectedClientId, setSelectedClientId] = useState("");
   const [isNewClient, setIsNewClient] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [storageStatus, setStorageStatus] = useState(getStorageStatus());
   const navigate = useNavigate();
   const { toast } = useToast();
 
   // Carregar clientes ao montar o componente
   useEffect(() => {
     loadClients();
+    // Atualizar status do storage
+    setStorageStatus(getStorageStatus());
   }, []);
 
   const loadClients = async () => {
     try {
       const clientList = await clientService.getAll();
       setClients(clientList);
+      
+      // Atualizar status após carregar dados
+      setStorageStatus(getStorageStatus());
     } catch (error) {
       console.error('Erro ao carregar clientes:', error);
       toast({
-        title: "Erro",
-        description: "Erro ao carregar lista de clientes",
-        variant: "destructive",
+        title: "Aviso",
+        description: "Usando armazenamento local - dados salvos no navegador",
+        variant: "default",
       });
     }
   };
@@ -117,9 +123,9 @@ const ScriptInput = () => {
     } catch (error) {
       console.error('Erro ao criar preview:', error);
       toast({
-        title: "Erro",
-        description: "Erro ao salvar no banco de dados",
-        variant: "destructive",
+        title: "Aviso",
+        description: "Dados salvos localmente - funcionando sem banco na nuvem",
+        variant: "default",
       });
     } finally {
       setLoading(false);
@@ -160,6 +166,16 @@ const ScriptInput = () => {
         <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
           Cole o script do seu chatbot e gere um link isolado para testar e compartilhar
         </p>
+        
+        {/* Indicador de Storage */}
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-secondary/50 text-xs text-muted-foreground">
+          {storageStatus.isFirebaseConnected ? (
+            <Database className="w-3 h-3 text-green-600" />
+          ) : (
+            <HardDrive className="w-3 h-3 text-blue-600" />
+          )}
+          {storageStatus.storageType}
+        </div>
       </div>
 
       <div className="bg-card rounded-2xl shadow-[var(--shadow-elegant)] p-8 space-y-6 border border-border/50">

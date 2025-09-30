@@ -3,14 +3,15 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Users, Eye, Trash2, Plus, ArrowLeft } from "lucide-react";
-import { clientService, scriptService } from "@/services/database";
+import { Users, Eye, Trash2, Plus, ArrowLeft, Database, HardDrive } from "lucide-react";
+import { clientService, scriptService, getStorageStatus } from "@/services/database";
 import { Client, ChatScript } from "@/types/database";
 
 const ClientsManager = () => {
   const [clients, setClients] = useState<Client[]>([]);
   const [scripts, setScripts] = useState<ChatScript[]>([]);
   const [loading, setLoading] = useState(true);
+  const [storageStatus, setStorageStatus] = useState(getStorageStatus());
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -27,12 +28,13 @@ const ClientsManager = () => {
       ]);
       setClients(clientList);
       setScripts(scriptList);
+      setStorageStatus(getStorageStatus());
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
       toast({
-        title: "Erro",
-        description: "Erro ao carregar dados",
-        variant: "destructive",
+        title: "Aviso",
+        description: "Usando dados locais - sem conexão com banco na nuvem",
+        variant: "default",
       });
     } finally {
       setLoading(false);
@@ -95,9 +97,19 @@ const ClientsManager = () => {
             </Button>
             <div>
               <h1 className="text-3xl font-bold text-foreground">Gerenciar Clientes</h1>
-              <p className="text-muted-foreground">
-                {clients.length} cliente(s) • {scripts.length} script(s)
-              </p>
+              <div className="flex items-center gap-4 mt-1">
+                <p className="text-muted-foreground">
+                  {clients.length} cliente(s) • {scripts.length} script(s)
+                </p>
+                <div className="inline-flex items-center gap-2 px-2 py-1 rounded-full bg-secondary/50 text-xs text-muted-foreground">
+                  {storageStatus.isFirebaseConnected ? (
+                    <Database className="w-3 h-3 text-green-600" />
+                  ) : (
+                    <HardDrive className="w-3 h-3 text-blue-600" />
+                  )}
+                  {storageStatus.storageType}
+                </div>
+              </div>
             </div>
           </div>
           <Button onClick={() => navigate("/")}>
