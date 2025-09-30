@@ -1,15 +1,104 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
-import { AlertCircle, MessageCircle, X } from "lucide-react";
+import { useParams, useNavigate } from "react-router-dom";
+import { AlertCircle, MessageCircle, X, Plus, Menu, Edit3, MoreHorizontal, Trash2 } from "lucide-react";
 import { scriptService } from "@/services/database";
 import { ChatScript } from "@/types/database";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { useToast } from "@/hooks/use-toast";
+
+// Tipo para as conversas do histórico
+type Conversation = {
+  id: string;
+  title: string;
+  lastMessage: string;
+  timestamp: Date;
+  isActive?: boolean;
+};
 
 const Preview = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
+  const { toast } = useToast();
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [scriptData, setScriptData] = useState<ChatScript | null>(null);
   const [showChatPopup, setShowChatPopup] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [conversations, setConversations] = useState<Conversation[]>([
+    {
+      id: "1",
+      title: "Procurando Exemplo História...",
+      lastMessage: "Olá! Como posso ajudar você hoje?",
+      timestamp: new Date(Date.now() - 1000 * 60 * 5), // 5 minutos atrás
+      isActive: true
+    },
+    {
+      id: "2",
+      title: "Suporte Técnico",
+      lastMessage: "Entendi o problema, vou verificar...",
+      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2), // 2 horas atrás
+    },
+    {
+      id: "3",
+      title: "Informações sobre Produto",
+      lastMessage: "Obrigado pelas informações!",
+      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24), // 1 dia atrás
+    }
+  ]);
+
+  const handleNewChat = () => {
+    const newConversation: Conversation = {
+      id: Date.now().toString(),
+      title: "Nova conversa",
+      lastMessage: "Iniciando nova conversa...",
+      timestamp: new Date(),
+      isActive: true
+    };
+    
+    setConversations(prev => [
+      newConversation,
+      ...prev.map(conv => ({ ...conv, isActive: false }))
+    ]);
+    
+    toast({
+      title: "Nova conversa iniciada",
+      description: "Uma nova conversa foi criada com sucesso."
+    });
+  };
+
+  const handleSelectConversation = (convId: string) => {
+    setConversations(prev => 
+      prev.map(conv => ({ 
+        ...conv, 
+        isActive: conv.id === convId 
+      }))
+    );
+    setSidebarOpen(false);
+  };
+
+  const handleDeleteConversation = (convId: string) => {
+    setConversations(prev => prev.filter(conv => conv.id !== convId));
+    toast({
+      title: "Conversa deletada",
+      description: "A conversa foi removida com sucesso."
+    });
+  };
+
+  const formatTimestamp = (date: Date) => {
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    const minutes = Math.floor(diff / (1000 * 60));
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+
+    if (minutes < 60) return `${minutes}m`;
+    if (hours < 24) return `${hours}h`;
+    return `${days}d`;
+  };
 
   useEffect(() => {
     if (!id) {
@@ -322,12 +411,9 @@ const Preview = () => {
           </div>
           <h1 className="text-2xl font-bold text-foreground">Erro ao Carregar</h1>
           <p className="text-muted-foreground">{error}</p>
-          <a
-            href="/"
-            className="inline-block mt-4 text-primary hover:underline"
-          >
+          <Button onClick={() => navigate("/")} variant="outline">
             Voltar para a página inicial
-          </a>
+          </Button>
         </div>
       </div>
     );
@@ -359,67 +445,168 @@ const Preview = () => {
     );
   }
 
-  return (
-    <div className="min-h-screen p-4" style={{ position: 'relative', zIndex: 1 }}>
-      <div className="max-w-4xl mx-auto">
-        <div className="bg-card/50 rounded-lg p-6 mb-4 border border-border/50">
-          <h1 className="text-xl font-semibold text-foreground mb-2">Preview do Chatbot</h1>
-          <p className="text-sm text-muted-foreground mb-4">
-            O widget deve aparecer no canto inferior direito da tela
-          </p>
-          <div className="text-xs text-muted-foreground space-y-1">
-            <p>• Verifique o console do navegador (F12) para logs de debug</p>
-            <p>• O widget pode levar alguns segundos para carregar</p>
-            <p>• Certifique-se de que o script colado é válido</p>
-            <p>• Se houver erro 400, verifique se o chatbot está ativo e o domínio é permitido</p>
-          </div>
+  const SidebarContent = () => (
+    <div className="flex flex-col h-full">
+      {/* Header */}
+      <div className="p-4 border-b">
+        <Button 
+          onClick={handleNewChat}
+          className="w-full justify-start gap-2 bg-primary hover:bg-primary/90"
+        >
+          <Edit3 className="w-4 h-4" />
+          Start New chat
+        </Button>
+      </div>
+
+      {/* Conversations List */}
+      <div className="flex-1 overflow-hidden">
+        <div className="p-4">
+          <h3 className="text-sm font-medium text-muted-foreground mb-3">New conversation</h3>
         </div>
         
-        {/* Alerta específico para erro CORS */}
-        <div className="bg-amber-50 dark:bg-amber-950/50 rounded-lg p-4 mb-4 border border-amber-200 dark:border-amber-800">
-          <div className="flex items-start gap-3">
-            <div className="text-amber-600 dark:text-amber-400 mt-0.5">⚠️</div>
-            <div className="flex-1">
-              <h3 className="font-medium text-amber-800 dark:text-amber-200 mb-1">
-                Possível Bloqueio de Domínio
-              </h3>
-              <p className="text-sm text-amber-700 dark:text-amber-300 mb-2">
-                O chatbot está retornando erro 400. Isso geralmente significa que o domínio não está autorizado.
-              </p>
-              <div className="text-xs text-amber-600 dark:text-amber-400 space-y-1">
-                <p><strong>Domínio atual:</strong> {window.location.origin}</p>
-                <p><strong>Para resolver:</strong></p>
-                <ol className="list-decimal list-inside space-y-1 ml-2">
-                  <li>Acesse as configurações do seu chatbot</li>
-                  <li>Adicione este domínio na lista de permitidos: <code className="bg-amber-100 dark:bg-amber-900 px-1 rounded">{window.location.origin}</code></li>
-                  <li>Salve as configurações</li>
-                  <li>Teste novamente</li>
-                </ol>
+        <ScrollArea className="flex-1 px-2">
+          <div className="space-y-1">
+            {conversations.map((conversation) => (
+              <div
+                key={conversation.id}
+                className={`group relative flex items-center gap-3 rounded-lg p-3 cursor-pointer transition-colors ${
+                  conversation.isActive 
+                    ? 'bg-secondary' 
+                    : 'hover:bg-secondary/50'
+                }`}
+                onClick={() => handleSelectConversation(conversation.id)}
+              >
+                <MessageCircle className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{conversation.title}</p>
+                  <p className="text-xs text-muted-foreground truncate">{conversation.lastMessage}</p>
+                </div>
+                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <span className="text-xs text-muted-foreground">
+                    {formatTimestamp(conversation.timestamp)}
+                  </span>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                        <MoreHorizontal className="w-3 h-3" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteConversation(conversation.id);
+                        }}
+                        className="text-destructive"
+                      >
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Deletar
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </div>
+            ))}
+          </div>
+        </ScrollArea>
+      </div>
+
+      {/* Footer */}
+      <div className="p-4 border-t">
+        <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <span>POWERED BY</span>
+          <span className="font-semibold">Dify</span>
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="min-h-screen flex bg-background" style={{ position: 'relative', zIndex: 1 }}>
+      {/* Desktop Sidebar */}
+      <div className="hidden lg:flex w-80 border-r bg-card/50">
+        <SidebarContent />
+      </div>
+
+      {/* Mobile Sidebar */}
+      <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
+        <SheetContent side="left" className="w-80 p-0">
+          <SidebarContent />
+        </SheetContent>
+      </Sheet>
+
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col">
+        {/* Mobile Header */}
+        <div className="lg:hidden flex items-center justify-between p-4 border-b">
+          <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="sm">
+                <Menu className="w-5 h-5" />
+              </Button>
+            </SheetTrigger>
+          </Sheet>
+          <h1 className="text-lg font-semibold">Talk to DEV - TALKA</h1>
+          <div className="w-9" /> {/* Spacer */}
+        </div>
+
+        {/* Chat Area */}
+        <div className="flex-1 flex items-center justify-center p-4">
+          <div className="max-w-2xl w-full space-y-6">
+            {/* Welcome Message */}
+            <div className="text-center space-y-4">
+              <div className="inline-block p-4 bg-primary/10 rounded-full">
+                <MessageCircle className="w-8 h-8 text-primary" />
+              </div>
+              <div className="space-y-2">
+                <h2 className="text-2xl font-bold text-foreground">Talk to DEV - TALKA</h2>
+                <p className="text-muted-foreground">
+                  O widget do chatbot aparecerá no canto inferior direito
+                </p>
+              </div>
+            </div>
+
+            {/* Info Cards */}
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="bg-card/50 rounded-lg p-4 border border-border/50">
+                <h3 className="font-medium mb-2">Status do Widget</h3>
+                <div className="text-sm text-muted-foreground space-y-1">
+                  <p>• Widget carregando...</p>
+                  <p>• Aguarde alguns segundos</p>
+                  <p>• Verifique o console (F12) para logs</p>
+                </div>
+              </div>
+              
+              <div className="bg-card/50 rounded-lg p-4 border border-border/50">
+                <h3 className="font-medium mb-2">Informações Técnicas</h3>
+                <div className="text-sm text-muted-foreground space-y-1">
+                  <p>• Domínio: {window.location.hostname}</p>
+                  <p>• Protocolo: {window.location.protocol}</p>
+                  {scriptData && (
+                    <p>• Cliente: {scriptData.clientName}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* CORS Warning */}
+            <div className="bg-amber-50 dark:bg-amber-950/50 rounded-lg p-4 border border-amber-200 dark:border-amber-800">
+              <div className="flex items-start gap-3">
+                <div className="text-amber-600 dark:text-amber-400 mt-0.5">⚠️</div>
+                <div className="flex-1">
+                  <h3 className="font-medium text-amber-800 dark:text-amber-200 mb-1">
+                    Configuração de Domínio
+                  </h3>
+                  <p className="text-sm text-amber-700 dark:text-amber-300 mb-2">
+                    Para o chatbot funcionar corretamente, adicione este domínio nas configurações:
+                  </p>
+                  <code className="bg-amber-100 dark:bg-amber-900 px-2 py-1 rounded text-xs">
+                    {window.location.origin}
+                  </code>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-        
-        {/* Debug info panel */}
-        <div className="bg-card/30 rounded-lg p-4 mb-4 border border-border/30">
-          <details className="text-sm">
-            <summary className="cursor-pointer font-medium text-foreground mb-2">
-              Informações de Debug
-            </summary>
-            <div className="text-xs text-muted-foreground space-y-1 mt-2">
-              <p><strong>Domínio atual:</strong> {window.location.hostname}</p>
-              <p><strong>Protocolo:</strong> {window.location.protocol}</p>
-              <p><strong>URL completa:</strong> {window.location.href}</p>
-              <p><strong>User Agent:</strong> {navigator.userAgent.substring(0, 100)}...</p>
-              {scriptData && (
-                <>
-                  <p><strong>Cliente:</strong> {scriptData.clientName}</p>
-                  <p><strong>Script ID:</strong> {scriptData.id}</p>
-                  <p><strong>Criado em:</strong> {scriptData.createdAt.toLocaleString('pt-BR')}</p>
-                </>
-              )}
-            </div>
-          </details>
         </div>
       </div>
 
