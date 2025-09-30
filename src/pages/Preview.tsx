@@ -39,6 +39,9 @@ const Preview = () => {
   const [forcandoAbertura, setForcandoAbertura] = useState(false);
   const conversaAtivaRef = useRef<string | null>(null);
   const injecaoTimestampRef = useRef<number>(0);
+  const [reiniciandoChat, setReiniciandoChat] = useState(false);
+  const [widgetQuebrado, setWidgetQuebrado] = useState(false);
+  const ultimoIdConversaRef = useRef<string | null>(null);
 
   // Carrega widgets arquivados do localStorage
   useEffect(() => {
@@ -140,34 +143,52 @@ const Preview = () => {
     persistirWidgets(lista);
   }, [widgetsArquivados]);
 
-  // Captura mudança do ID de conversa via hook em localStorage.setItem
+  // Captura mudança do ID de conversa via hook em localStorage e sessionStorage
   useEffect(() => {
     if ((window as any).__conversationHooked) return;
+    
+    const capturarNovoId = (novoId: string, fonte: string) => {
+      console.log(`Novo ID de conversa detectado (${fonte}):`, novoId);
+      if (ultimoIdConversaRef.current === novoId) return;
+      
+      ultimoIdConversaRef.current = novoId;
+      conversaAtivaRef.current = novoId;
+      
+      setWidgetsArquivados(prev => {
+        if (prev.some(w => w.id === novoId)) {
+          return prev.map(w => ({ ...w, isActive: w.id === novoId, ultimaAtualizacao: Date.now() }));
+        }
+        const novo: WidgetArquivado = {
+          id: novoId,
+          titulo: `Conversa ${prev.length + 1}`,
+          criadoEm: Date.now(),
+          ultimaAtualizacao: Date.now(),
+          isActive: true
+        };
+        return [novo, ...prev.map(w => ({ ...w, isActive: false }))];
+      });
+    };
+    
+    // Hook localStorage
     const originalSetItem = localStorage.setItem.bind(localStorage);
-  (localStorage as any).setItem = (key: string, value: string) => {
+    (localStorage as any).setItem = (key: string, value: string) => {
       originalSetItem(key, value);
-      if (key === CONVERSATION_STORAGE_KEY) {
-        // Novo ID detectado
-        conversaAtivaRef.current = value;
-        setWidgetsArquivados(prev => {
-          if (prev.some(w => w.id === value)) {
-            return prev.map(w => ({ ...w, isActive: w.id === value, ultimaAtualizacao: Date.now() }));
-          }
-          const novo: WidgetArquivado = {
-            id: value,
-            titulo: `Conversa ${prev.length + 1}`,
-            criadoEm: Date.now(),
-            ultimaAtualizacao: Date.now(),
-            isActive: true
-          };
-            return [novo, ...prev.map(w => ({ ...w, isActive: false }))];
-        });
+      if (key === CONVERSATION_STORAGE_KEY && value) {
+        capturarNovoId(value, 'localStorage');
       }
-  };
+    };
+    
+    // Hook sessionStorage também
+    const originalSessionSetItem = sessionStorage.setItem.bind(sessionStorage);
+    (sessionStorage as any).setItem = (key: string, value: string) => {
+      originalSessionSetItem(key, value);
+      if (key === CONVERSATION_STORAGE_KEY && value) {
+        capturarNovoId(value, 'sessionStorage');
+      }
+    };
+    
     (window as any).__conversationHooked = true;
-  }, []);
-
-  // Injeta o script do widget sem mostrar popup
+  }, []);  // Injeta o script do widget sem mostrar popup
   const injetarWidget = useCallback(async () => {
     if (reinjetandoRef.current) return;
     reinjetandoRef.current = true;
@@ -236,10 +257,27 @@ const Preview = () => {
       const posicionarWidget = () => {
         const host: any = document.querySelector('ra-chatbot-widget');
         if (host) {
-          host.style.position = 'fixed';
-            host.style.bottom = '24px';
-            host.style.right = '24px';
-            host.style.zIndex = '9999';
+          const styles = {
+            position: 'fixed',
+            bottom: '24px',
+            right: '24px',
+            zIndex: '9999',
+            maxWidth: '400px',
+            maxHeight: '600px',
+            minWidth: '320px',
+            minHeight: '80px'
+          };
+          Object.assign(host.style, styles);
+          
+          // Detectar se widget virou quadrado/quebrou
+          setTimeout(() => {
+            const rect = host.getBoundingClientRect();
+            const aspectRatio = rect.width / rect.height;
+            if (aspectRatio > 0.8 && aspectRatio < 1.2 && rect.height < 200) {
+              console.warn('Widget quebrado detectado, tentando recriar');
+              setWidgetQuebrado(true);
+            }
+          }, 2000);
         }
       };
 
@@ -346,16 +384,43 @@ const Preview = () => {
     }
   };
 
-  // Cria novo widget
-  const criarNovoWidget = () => {
+  // Cria novo widget com reinício completo
+  const criarNovoWidget = async () => {
+    setReiniciandoChat(true);
     arquivarWidgetAtual();
-    localStorage.removeItem(CONVERSATION_STORAGE_KEY);
     
-    // Força reload para limpar estado
+    // Limpar completamente o estado do chat
+    localStorage.removeItem(CONVERSATION_STORAGE_KEY);
+    sessionStorage.removeItem(CONVERSATION_STORAGE_KEY);
+    
+    // Limpar cookies relacionados ao chat
+    document.cookie.split(';').forEach(cookie => {
+      const eqPos = cookie.indexOf('=');
+      const name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim();
+      if (name.includes('chat') || name.includes('conversation') || name.includes('widget')) {
+        document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=.${window.location.hostname}`;
+        document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
+      }
+    });
+    
+    // Resetar referências
+    conversaAtivaRef.current = null;
+    ultimoIdConversaRef.current = null;
+    
+    // Remover widget atual completamente
+    document.querySelectorAll('ra-chatbot-widget, [id*="chatbot"], [class*="chatbot"]').forEach(el => el.remove());
+    const oldScript = document.getElementById(WIDGET_SCRIPT_ID);
+    if (oldScript) oldScript.remove();
+    
     setIsLoading(true);
-    injetarWidget();
+    
+    // Aguardar um pouco antes de recriar
+    setTimeout(() => {
+      injetarWidget();
+      setReiniciandoChat(false);
+    }, 500);
+    
     setSidebarOpen(false);
-    // Removido toast verde para evitar "pop" visual
   };
 
   // Seleciona widget arquivado
@@ -444,10 +509,29 @@ const Preview = () => {
     }
   }, [scriptData, injetarWidget]);
 
-  // Aplica limpeza contínua
+  // Aplica limpeza contínua e verificação de posicionamento
   useEffect(() => {
     const interval = setInterval(() => {
       removerPopupsEBranding();
+      
+      // Verificar e corrigir posicionamento do widget
+      const host: any = document.querySelector('ra-chatbot-widget');
+      if (host) {
+        const computedStyle = window.getComputedStyle(host);
+        if (computedStyle.position !== 'fixed' || 
+            computedStyle.bottom !== '24px' || 
+            computedStyle.right !== '24px') {
+          const styles = {
+            position: 'fixed',
+            bottom: '24px',
+            right: '24px',
+            zIndex: '9999',
+            maxWidth: '400px',
+            maxHeight: '600px'
+          };
+          Object.assign(host.style, styles);
+        }
+      }
     }, 1000);
 
     return () => clearInterval(interval);
@@ -490,10 +574,11 @@ const Preview = () => {
       <div className="p-4 border-b">
         <Button 
           onClick={criarNovoWidget}
+          disabled={reiniciandoChat}
           className="w-full justify-start gap-2 bg-primary hover:bg-primary/90"
         >
           <Edit3 className="w-4 h-4" />
-          Nova conversa
+          {reiniciandoChat ? 'Reiniciando...' : 'Nova conversa'}
         </Button>
       </div>
 
@@ -647,6 +732,24 @@ const Preview = () => {
                 </div>
               </div>
             </div>
+
+            {/* Widget Quebrado Warning */}
+            {widgetQuebrado && (
+              <div className="bg-red-50 dark:bg-red-950/50 rounded-lg p-4 border border-red-200 dark:border-red-800">
+                <div className="flex items-start gap-3">
+                  <div className="text-red-600 dark:text-red-400 mt-0.5">⚠️</div>
+                  <div className="flex-1">
+                    <h3 className="font-medium text-red-800 dark:text-red-200 mb-1">
+                      Widget com problema detectado
+                    </h3>
+                    <div className="text-sm text-red-700 dark:text-red-300 space-y-1">
+                      <p>• O widget pode estar quebrado ou em formato incorreto</p>
+                      <p>• Clique em "Nova conversa" para reiniciar</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Instructions */}
             <div className="bg-amber-50 dark:bg-amber-950/50 rounded-lg p-4 border border-amber-200 dark:border-amber-800">
