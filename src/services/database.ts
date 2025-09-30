@@ -76,20 +76,15 @@ export const clientService = {
   // Criar novo cliente
   async create(data: CreateClientData): Promise<string> {
     if (isBaserowAvailable()) {
-      try {
-        const response = await baserowRequest(`/api/database/rows/table/${BASEROW_CONFIG.tables.clients}/`, {
-          method: 'POST',
-          body: JSON.stringify({
-            name: data.name,
-            email: data.email || '',
-            company: data.company || ''
-          })
-        });
-        return response.id.toString();
-      } catch (error) {
-        console.error('Erro ao criar cliente no Baserow, usando localStorage:', error);
-        return this.createLocal(data);
-      }
+      const response = await baserowRequest(`/api/database/rows/table/${BASEROW_CONFIG.tables.clients}/`, {
+        method: 'POST',
+        body: JSON.stringify({
+          name: data.name,
+          email: data.email || '',
+          company: data.company || ''
+        })
+      });
+      return response.id.toString();
     } else {
       return this.createLocal(data);
     }
@@ -133,19 +128,15 @@ export const clientService = {
   // Atualizar cliente
   async update(id: string, data: Partial<CreateClientData>): Promise<void> {
     if (isBaserowAvailable()) {
-      try {
-        await baserowRequest(`/api/database/rows/table/${BASEROW_CONFIG.tables.clients}/${id}/`, {
-          method: 'PATCH',
-          body: JSON.stringify({
-            name: data.name,
-            email: data.email || '',
-            company: data.company || ''
-          })
-        });
-        return;
-      } catch (error) {
-        console.error('Erro ao atualizar cliente no Baserow, usando localStorage:', error);
-      }
+      await baserowRequest(`/api/database/rows/table/${BASEROW_CONFIG.tables.clients}/${id}/`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          name: data.name,
+          email: data.email || '',
+          company: data.company || ''
+        })
+      });
+      return;
     }
     
     // Local fallback
@@ -160,14 +151,10 @@ export const clientService = {
   // Deletar cliente
   async delete(id: string): Promise<void> {
     if (isBaserowAvailable()) {
-      try {
-        await baserowRequest(`/api/database/rows/table/${BASEROW_CONFIG.tables.clients}/${id}/`, {
-          method: 'DELETE'
-        });
-        return;
-      } catch (error) {
-        console.error('Erro ao deletar cliente no Baserow, usando localStorage:', error);
-      }
+      await baserowRequest(`/api/database/rows/table/${BASEROW_CONFIG.tables.clients}/${id}/`, {
+        method: 'DELETE'
+      });
+      return;
     }
     
     // Local fallback
@@ -182,23 +169,18 @@ export const scriptService = {
   // Criar novo script
   async create(data: CreateScriptData): Promise<string> {
     if (isBaserowAvailable()) {
-      try {
-        const response = await baserowRequest(`/api/database/rows/table/${BASEROW_CONFIG.tables.scripts}/`, {
-          method: 'POST',
-          body: JSON.stringify({
-            // parseInt é seguro agora por causa do FIX 2
-            client_id: parseInt(data.clientId),
-            client_name: data.clientName,
-            script: data.script,
-            title: data.title || `Script - ${data.clientName}`,
-            is_active: true
-          })
-        });
-        return response.id.toString();
-      } catch (error) {
-        console.error('Erro ao criar script no Baserow, usando localStorage:', error);
-        return this.createLocal(data);
-      }
+      const response = await baserowRequest(`/api/database/rows/table/${BASEROW_CONFIG.tables.scripts}/`, {
+        method: 'POST',
+        body: JSON.stringify({
+          // parseInt é seguro agora por causa do FIX 2
+          client_id: parseInt(data.clientId),
+          client_name: data.clientName,
+          script: data.script,
+          title: data.title || `Script - ${data.clientName}`,
+          is_active: true
+        })
+      });
+      return response.id.toString();
     } else {
       return this.createLocal(data);
     }
@@ -302,20 +284,16 @@ export const scriptService = {
   // Atualizar script
   async update(id: string, data: Partial<CreateScriptData>): Promise<void> {
     if (isBaserowAvailable()) {
-      try {
-        const updateData: any = {};
-        if (data.script) updateData.script = data.script;
-        if (data.title) updateData.title = data.title;
-        if (data.clientName) updateData.client_name = data.clientName;
-        
-        await baserowRequest(`/api/database/rows/table/${BASEROW_CONFIG.tables.scripts}/${id}/`, {
-          method: 'PATCH',
-          body: JSON.stringify(updateData)
-        });
-        return;
-      } catch (error) {
-        console.error('Erro ao atualizar script no Baserow, usando localStorage:', error);
-      }
+      const updateData: any = {};
+      if (data.script) updateData.script = data.script;
+      if (data.title) updateData.title = data.title;
+      if (data.clientName) updateData.client_name = data.clientName;
+      
+      await baserowRequest(`/api/database/rows/table/${BASEROW_CONFIG.tables.scripts}/${id}/`, {
+        method: 'PATCH',
+        body: JSON.stringify(updateData)
+      });
+      return;
     }
     
     // Local fallback
@@ -330,14 +308,10 @@ export const scriptService = {
   // Deletar script
   async delete(id: string): Promise<void> {
     if (isBaserowAvailable()) {
-      try {
-        await baserowRequest(`/api/database/rows/table/${BASEROW_CONFIG.tables.scripts}/${id}/`, {
-          method: 'DELETE'
-        });
-        return;
-      } catch (error) {
-        console.error('Erro ao deletar script no Baserow, usando localStorage:', error);
-      }
+      await baserowRequest(`/api/database/rows/table/${BASEROW_CONFIG.tables.scripts}/${id}/`, {
+        method: 'DELETE'
+      });
+      return;
     }
     
     // Local fallback

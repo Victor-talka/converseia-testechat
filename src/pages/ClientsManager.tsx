@@ -2,8 +2,12 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Users, Eye, Trash2, Plus, ArrowLeft, Database, HardDrive } from "lucide-react";
+import { Users, Eye, Trash2, Plus, ArrowLeft, Database, HardDrive, Edit, Copy, Link } from "lucide-react";
 import { clientService, scriptService, getStorageStatus } from "@/services/database";
 import { Client, ChatScript } from "@/types/database";
 
@@ -12,6 +16,8 @@ const ClientsManager = () => {
   const [scripts, setScripts] = useState<ChatScript[]>([]);
   const [loading, setLoading] = useState(true);
   const [storageStatus, setStorageStatus] = useState(getStorageStatus());
+  const [editingScript, setEditingScript] = useState<ChatScript | null>(null);
+  const [editForm, setEditForm] = useState({ title: '', script: '' });
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -72,6 +78,53 @@ const ClientsManager = () => {
 
   const getClientScripts = (clientId: string) => {
     return scripts.filter(script => script.clientId === clientId);
+  };
+
+  const handleEditScript = (script: ChatScript) => {
+    setEditingScript(script);
+    setEditForm({ title: script.title, script: script.script });
+  };
+
+  const handleSaveScript = async () => {
+    if (!editingScript) return;
+    
+    try {
+      await scriptService.update(editingScript.id, {
+        title: editForm.title,
+        script: editForm.script
+      });
+      
+      toast({
+        title: "Script atualizado",
+        description: "As alterações foram salvas com sucesso",
+      });
+      
+      setEditingScript(null);
+      await loadData();
+    } catch (error) {
+      console.error('Erro ao atualizar script:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao atualizar script",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleCopyLink = (scriptId: string) => {
+    const link = `${window.location.origin}/preview/${scriptId}`;
+    navigator.clipboard.writeText(link).then(() => {
+      toast({
+        title: "Link copiado!",
+        description: "O link do preview foi copiado para a área de transferência",
+      });
+    }).catch(() => {
+      toast({
+        title: "Erro",
+        description: "Não foi possível copiar o link",
+        variant: "destructive",
+      });
+    });
   };
 
   if (loading) {
@@ -183,14 +236,66 @@ const ClientsManager = () => {
                                   Criado em {script.createdAt.toLocaleDateString('pt-BR')} às {script.createdAt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                                 </p>
                               </div>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => window.open(`/preview/${script.id}`, '_blank')}
-                              >
-                                <Eye className="w-4 h-4 mr-1" />
-                                Ver Preview
-                              </Button>
+                              <div className="flex gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleCopyLink(script.id)}
+                                >
+                                  <Copy className="w-4 h-4" />
+                                </Button>
+                                <Dialog>
+                                  <DialogTrigger asChild>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => handleEditScript(script)}
+                                    >
+                                      <Edit className="w-4 h-4" />
+                                    </Button>
+                                  </DialogTrigger>
+                                  <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+                                    <DialogHeader>
+                                      <DialogTitle>Editar Script</DialogTitle>
+                                    </DialogHeader>
+                                    <div className="space-y-4 flex-1 overflow-hidden">
+                                      <div>
+                                        <Label htmlFor="title">Título</Label>
+                                        <Input
+                                          id="title"
+                                          value={editForm.title}
+                                          onChange={(e) => setEditForm(prev => ({ ...prev, title: e.target.value }))}
+                                        />
+                                      </div>
+                                      <div className="flex-1 flex flex-col overflow-hidden">
+                                        <Label htmlFor="script">Script</Label>
+                                        <Textarea
+                                          id="script"
+                                          value={editForm.script}
+                                          onChange={(e) => setEditForm(prev => ({ ...prev, script: e.target.value }))}
+                                          className="flex-1 min-h-[400px] font-mono text-sm"
+                                          placeholder="Digite o script aqui..."
+                                        />
+                                      </div>
+                                    </div>
+                                    <div className="flex justify-end gap-2 pt-4">
+                                      <Button variant="outline" onClick={() => setEditingScript(null)}>
+                                        Cancelar
+                                      </Button>
+                                      <Button onClick={handleSaveScript}>
+                                        Salvar Alterações
+                                      </Button>
+                                    </div>
+                                  </DialogContent>
+                                </Dialog>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => window.open(`/preview/${script.id}`, '_blank')}
+                                >
+                                  <Eye className="w-4 h-4" />
+                                </Button>
+                              </div>
                             </div>
                           ))}
                         </div>
