@@ -1,11 +1,11 @@
 // Configuração do Baserow
 const BASEROW_CONFIG = {
   apiToken: import.meta.env.VITE_BASEROW_API_TOKEN || "wT4NNP5hwTaVuzixirWycVT4D4xDRorE",
-  baseUrl: import.meta.env.VITE_BASEROW_BASE_URL || "https://api.baserow.io/api",
-  databaseId: import.meta.env.VITE_BASEROW_DATABASE_ID || "256831", // Será configurado
+  baseUrl: import.meta.env.VITE_BASEROW_BASE_URL || "https://api.baserow.io",
+  databaseId: import.meta.env.VITE_BASEROW_DATABASE_ID || "296836",
   tables: {
-    clients: import.meta.env.VITE_BASEROW_CLIENTS_TABLE_ID || "765433", // Será configurado
-    scripts: import.meta.env.VITE_BASEROW_SCRIPTS_TABLE_ID || "765434"  // Será configurado
+    clients: import.meta.env.VITE_BASEROW_CLIENTS_TABLE_ID || "689319",
+    scripts: import.meta.env.VITE_BASEROW_SCRIPTS_TABLE_ID || "689333"
   }
 };
 
@@ -53,9 +53,16 @@ export const testBaserowConnection = async () => {
       return { success: false, message: "Baserow não configurado" };
     }
 
-    // Tentar buscar informações do banco
-    await baserowRequest(`/database/${BASEROW_CONFIG.databaseId}/`);
-    console.log("✅ Baserow conectado com sucesso");
+    console.log("🔍 Testando conexão Baserow...");
+    console.log("Config:", {
+      baseUrl: BASEROW_CONFIG.baseUrl,
+      databaseId: BASEROW_CONFIG.databaseId,
+      apiToken: BASEROW_CONFIG.apiToken ? "***" + BASEROW_CONFIG.apiToken.slice(-4) : "não definido"
+    });
+
+    // Tentar buscar as tabelas do banco
+    const response = await baserowRequest(`/api/database/tables/${BASEROW_CONFIG.databaseId}/`);
+    console.log("✅ Baserow conectado com sucesso", response);
     return { success: true, message: "Conectado ao Baserow" };
   } catch (error) {
     console.warn("⚠️ Erro ao conectar Baserow:", error);

@@ -75,7 +75,7 @@ export const clientService = {
   async create(data: CreateClientData): Promise<string> {
     if (isBaserowAvailable()) {
       try {
-        const response = await baserowRequest(`/database/rows/table/${BASEROW_CONFIG.tables.clients}/`, {
+        const response = await baserowRequest(`/api/api/api/database/rows/table/${BASEROW_CONFIG.tables.clients}/`, {
           method: 'POST',
           body: JSON.stringify({
             name: data.name,
@@ -110,7 +110,7 @@ export const clientService = {
   async getAll(): Promise<Client[]> {
     if (isBaserowAvailable()) {
       try {
-        const response = await baserowRequest(`/database/rows/table/${BASEROW_CONFIG.tables.clients}/?order_by=-created_on`);
+        const response = await baserowRequest(`/api/api/api/database/rows/table/${BASEROW_CONFIG.tables.clients}/?order_by=-created_on`);
         return response.results.map(mapBaserowClient);
       } catch (error) {
         console.error('Erro ao buscar clientes no Baserow, usando localStorage:', error);
@@ -131,7 +131,7 @@ export const clientService = {
   async update(id: string, data: Partial<CreateClientData>): Promise<void> {
     if (isBaserowAvailable()) {
       try {
-        await baserowRequest(`/database/rows/table/${BASEROW_CONFIG.tables.clients}/${id}/`, {
+        await baserowRequest(`/api/api/api/database/rows/table/${BASEROW_CONFIG.tables.clients}/${id}/`, {
           method: 'PATCH',
           body: JSON.stringify({
             name: data.name,
@@ -158,7 +158,7 @@ export const clientService = {
   async delete(id: string): Promise<void> {
     if (isBaserowAvailable()) {
       try {
-        await baserowRequest(`/database/rows/table/${BASEROW_CONFIG.tables.clients}/${id}/`, {
+        await baserowRequest(`/api/api/api/database/rows/table/${BASEROW_CONFIG.tables.clients}/${id}/`, {
           method: 'DELETE'
         });
         return;
@@ -180,7 +180,7 @@ export const scriptService = {
   async create(data: CreateScriptData): Promise<string> {
     if (isBaserowAvailable()) {
       try {
-        const response = await baserowRequest(`/database/rows/table/${BASEROW_CONFIG.tables.scripts}/`, {
+        const response = await baserowRequest(`/api/api/api/database/rows/table/${BASEROW_CONFIG.tables.scripts}/`, {
           method: 'POST',
           body: JSON.stringify({
             client_id: parseInt(data.clientId),
@@ -218,7 +218,7 @@ export const scriptService = {
   async getAll(): Promise<ChatScript[]> {
     if (isBaserowAvailable()) {
       try {
-        const response = await baserowRequest(`/database/rows/table/${BASEROW_CONFIG.tables.scripts}/?order_by=-created_on`);
+        const response = await baserowRequest(`/api/api/database/rows/table/${BASEROW_CONFIG.tables.scripts}/?order_by=-created_on`);
         return response.results.map(mapBaserowScript);
       } catch (error) {
         console.error('Erro ao buscar scripts no Baserow, usando localStorage:', error);
@@ -239,7 +239,7 @@ export const scriptService = {
   async getById(id: string): Promise<ChatScript | null> {
     if (isBaserowAvailable()) {
       try {
-        const response = await baserowRequest(`/database/rows/table/${BASEROW_CONFIG.tables.scripts}/${id}/`);
+        const response = await baserowRequest(`/api/api/database/rows/table/${BASEROW_CONFIG.tables.scripts}/${id}/`);
         return mapBaserowScript(response);
       } catch (error) {
         console.error('Erro ao buscar script no Baserow, usando localStorage:', error);
@@ -282,7 +282,7 @@ export const scriptService = {
   async getByClient(clientId: string): Promise<ChatScript[]> {
     if (isBaserowAvailable()) {
       try {
-        const response = await baserowRequest(`/database/rows/table/${BASEROW_CONFIG.tables.scripts}/?filter__client_id=${clientId}&order_by=-created_on`);
+        const response = await baserowRequest(`/api/api/database/rows/table/${BASEROW_CONFIG.tables.scripts}/?filter__client_id=${clientId}&order_by=-created_on`);
         return response.results.map(mapBaserowScript);
       } catch (error) {
         console.error('Erro ao buscar scripts do cliente no Baserow:', error);
@@ -302,7 +302,7 @@ export const scriptService = {
         if (data.title) updateData.title = data.title;
         if (data.clientName) updateData.client_name = data.clientName;
         
-        await baserowRequest(`/database/rows/table/${BASEROW_CONFIG.tables.scripts}/${id}/`, {
+        await baserowRequest(`/api/api/database/rows/table/${BASEROW_CONFIG.tables.scripts}/${id}/`, {
           method: 'PATCH',
           body: JSON.stringify(updateData)
         });
@@ -325,7 +325,7 @@ export const scriptService = {
   async delete(id: string): Promise<void> {
     if (isBaserowAvailable()) {
       try {
-        await baserowRequest(`/database/rows/table/${BASEROW_CONFIG.tables.scripts}/${id}/`, {
+        await baserowRequest(`/api/api/database/rows/table/${BASEROW_CONFIG.tables.scripts}/${id}/`, {
           method: 'DELETE'
         });
         return;
