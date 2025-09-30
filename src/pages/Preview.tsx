@@ -34,6 +34,9 @@ const Preview = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [widgetsArquivados, setWidgetsArquivados] = useState<WidgetArquivado[]>([]);
   const reinjetandoRef = useRef(false);
+  const [slugDetectado, setSlugDetectado] = useState<string | null>(null);
+  const [debugFetches, setDebugFetches] = useState<any[]>([]);
+  const [forcandoAbertura, setForcandoAbertura] = useState(false);
 
   // Carrega widgets arquivados do localStorage
   useEffect(() => {
@@ -158,7 +161,18 @@ const Preview = () => {
 
       const firstTag = scriptTags[0];
       const hasSrc = firstTag.getAttribute('src');
-      const scriptContent = firstTag.textContent || firstTag.innerHTML || '';
+      let scriptContent = firstTag.textContent || firstTag.innerHTML || '';
+
+      // Patch para evitar erro de redefinição do custom element
+      if (scriptContent.includes("customElements.define('ra-chatbot-widget'")) {
+        scriptContent = scriptContent.replace(/customElements\.define\('ra-chatbot-widget'/, "if(!customElements.get('ra-chatbot-widget')) customElements.define('ra-chatbot-widget'");
+      }
+
+      // Detectar slug no script
+      try {
+        const slugMatch = scriptContent.match(/slug=([a-zA-Z0-9_-]+)/) || scriptContent.match(/"slug"\s*:\s*"([^"]+)"/);
+        if (slugMatch) setSlugDetectado(slugMatch[1]);
+      } catch {}
 
       console.log("Injetando script do widget... (externo:", !!hasSrc, ")");
 
@@ -212,6 +226,80 @@ const Preview = () => {
       setIsLoading(false);
     }
   }, [scriptData, removerPopupsEBranding]);
+
+  // Interceptar fetch para logar chamadas do widget
+  useEffect(() => {
+    if ((window as any).__widgetFetchPatched) return;
+    (window as any).__widgetDebug = { fetches: [] };
+    const originalFetch = window.fetch.bind(window);
+  (window as any).fetch = async (...args: any[]) => {
+      const started = performance.now();
+      let url = args[0];
+      try {
+        const res = await originalFetch(...args);
+        if (typeof url === 'string' && url.includes('/api/get_widget')) {
+          (window as any).__widgetDebug.fetches.push({
+            at: Date.now(),
+            url,
+            status: res.status,
+            ok: res.ok,
+            ms: Math.round(performance.now() - started)
+          });
+          window.dispatchEvent(new CustomEvent('widget-debug-update'));
+        }
+        return res;
+      } catch (error) {
+        if (typeof url === 'string' && url.includes('/api/get_widget')) {
+          (window as any).__widgetDebug.fetches.push({
+            at: Date.now(),
+            url,
+            error: String(error)
+          });
+          window.dispatchEvent(new CustomEvent('widget-debug-update'));
+        }
+        throw error;
+      }
+  };
+    (window as any).__widgetFetchPatched = true;
+  }, []);
+
+  // Atualizar estado de logs
+  useEffect(() => {
+    const handler = () => {
+      try {
+        setDebugFetches([...(window as any).__widgetDebug.fetches].slice(-5));
+      } catch {}
+    };
+    window.addEventListener('widget-debug-update', handler);
+    return () => window.removeEventListener('widget-debug-update', handler);
+  }, []);
+
+  const forcarAbrirChat = () => {
+    setForcandoAbertura(true);
+    setTimeout(() => setForcandoAbertura(false), 1500);
+    try {
+      const el: any = document.querySelector('ra-chatbot-widget');
+      if (!el) {
+        console.warn('Elemento <ra-chatbot-widget> não encontrado');
+        return;
+      }
+      const metodos = ['open', 'openChat', 'show', 'toggle', 'expand'];
+      for (const m of metodos) {
+        if (typeof el[m] === 'function') {
+          try { el[m](); console.log('Método chamado:', m); return; } catch {}
+        }
+      }
+      // Tentar clicar no primeiro botão do shadow root
+      const root: any = el.shadowRoot;
+      if (root) {
+        const btn = root.querySelector('button, [role=button]') as HTMLElement | null;
+        if (btn) { btn.click(); console.log('Clique forçado em botão interno'); return; }
+      }
+      console.warn('Nenhuma estratégia de abertura funcionou');
+    } catch (e) {
+      console.error('Erro ao tentar abrir chat:', e);
+    }
+  };
 
   // Cria novo widget
   const criarNovoWidget = () => {
@@ -508,6 +596,20 @@ const Preview = () => {
                   {scriptData && (
                     <p>• Cliente: {scriptData.clientName}</p>
                   )}
+                  {slugDetectado && <p>• Slug detectado: <span className="font-medium">{slugDetectado}</span></p>}
+                  {debugFetches.length > 0 && (
+                    <div className="pt-2 space-y-1">
+                      <p className="font-semibold text-foreground">Requisições:</p>
+                      {debugFetches.map((f, i) => (
+                        <p key={i} className="text-xs">
+                          {new Date(f.at).toLocaleTimeString()} → {f.status || 'ERR'} {f.ok === false && '❌'}
+                        </p>
+                      ))}
+                    </div>
+                  )}
+                  <Button size="sm" variant="outline" className="mt-2" onClick={forcarAbrirChat} disabled={forcandoAbertura}>
+                    {forcandoAbertura ? 'Tentando...' : 'Forçar abrir chat'}
+                  </Button>
                 </div>
               </div>
             </div>
