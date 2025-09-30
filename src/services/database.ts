@@ -76,18 +76,22 @@ export const clientService = {
   // Criar novo cliente
   async create(data: CreateClientData): Promise<string> {
     if (isBaserowAvailable()) {
-      const response = await baserowRequest(`/api/database/rows/table/${BASEROW_CONFIG.tables.clients}/`, {
-        method: 'POST',
-        body: JSON.stringify({
-          field_5700970: data.name,     // name
-          field_5701032: data.email || '',  // email 
-          field_5701033: data.company || '' // company
-        })
-      });
-      return response.id.toString();
-    } else {
-      return this.createLocal(data);
+      try {
+        const response = await baserowRequest(`/api/database/rows/table/${BASEROW_CONFIG.tables.clients}/`, {
+          method: 'POST',
+          body: JSON.stringify({
+            field_5700970: data.name,     // name
+            field_5701032: data.email || '',  // email 
+            field_5701033: data.company || '' // company
+          })
+        });
+        return response.id.toString();
+      } catch (e) {
+        console.warn('[clientService.create] Falha Baserow, usando localStorage:', e);
+        return this.createLocal(data);
+      }
     }
+    return this.createLocal(data);
   },
 
   createLocal(data: CreateClientData): string {
@@ -128,18 +132,21 @@ export const clientService = {
   // Atualizar cliente
   async update(id: string, data: Partial<CreateClientData>): Promise<void> {
     if (isBaserowAvailable()) {
-      await baserowRequest(`/api/database/rows/table/${BASEROW_CONFIG.tables.clients}/${id}/`, {
-        method: 'PATCH',
-        body: JSON.stringify({
-          field_5700970: data.name,
-          field_5701032: data.email || '',
-          field_5701033: data.company || ''
-        })
-      });
-      return;
+      try {
+        await baserowRequest(`/api/database/rows/table/${BASEROW_CONFIG.tables.clients}/${id}/`, {
+          method: 'PATCH',
+          body: JSON.stringify({
+            field_5700970: data.name,
+            field_5701032: data.email || '',
+            field_5701033: data.company || ''
+          })
+        });
+        return;
+      } catch (e) {
+        console.warn('[clientService.update] Falha Baserow, fallback local:', e);
+      }
     }
-    
-    // Local fallback
+
     const clients = localStorage_utils.getClients();
     const index = clients.findIndex(c => c.id === id);
     if (index !== -1) {
@@ -151,13 +158,16 @@ export const clientService = {
   // Deletar cliente
   async delete(id: string): Promise<void> {
     if (isBaserowAvailable()) {
-      await baserowRequest(`/api/database/rows/table/${BASEROW_CONFIG.tables.clients}/${id}/`, {
-        method: 'DELETE'
-      });
-      return;
+      try {
+        await baserowRequest(`/api/database/rows/table/${BASEROW_CONFIG.tables.clients}/${id}/`, {
+          method: 'DELETE'
+        });
+        return;
+      } catch (e) {
+        console.warn('[clientService.delete] Falha Baserow, fallback local:', e);
+      }
     }
-    
-    // Local fallback
+
     const clients = localStorage_utils.getClients();
     const filtered = clients.filter(c => c.id !== id);
     localStorage_utils.saveClients(filtered);
@@ -169,26 +179,26 @@ export const scriptService = {
   // Criar novo script
   async create(data: CreateScriptData): Promise<string> {
     if (isBaserowAvailable()) {
-      // Garantir que client_id seja numérico
-      const clientIdNumber = parseInt(data.clientId);
-      if (isNaN(clientIdNumber)) {
-        throw new Error(`ID do cliente inválido: ${data.clientId}. Deve ser numérico para sincronizar com Baserow.`);
+      try {
+        const clientIdNumber = parseInt(data.clientId);
+        if (isNaN(clientIdNumber)) throw new Error(`ID do cliente inválido: ${data.clientId}`);
+        const response = await baserowRequest(`/api/database/rows/table/${BASEROW_CONFIG.tables.scripts}/`, {
+          method: 'POST',
+            body: JSON.stringify({
+            field_5701034: clientIdNumber,
+            field_5701038: data.clientName,
+            field_5701039: data.script,
+            field_5701040: data.title || `Script - ${data.clientName}`,
+            field_5701041: true
+          })
+        });
+        return response.id.toString();
+      } catch (e) {
+        console.warn('[scriptService.create] Falha Baserow, usando localStorage:', e);
+        return this.createLocal(data);
       }
-      
-      const response = await baserowRequest(`/api/database/rows/table/${BASEROW_CONFIG.tables.scripts}/`, {
-        method: 'POST',
-        body: JSON.stringify({
-          field_5701034: clientIdNumber,  // client_id
-          field_5701038: data.clientName, // client_name
-          field_5701039: data.script,     // script
-          field_5701040: data.title || `Script - ${data.clientName}`, // title
-          field_5701041: true             // is_active
-        })
-      });
-      return response.id.toString();
-    } else {
-      return this.createLocal(data);
     }
+    return this.createLocal(data);
   },
 
   createLocal(data: CreateScriptData): string {
@@ -292,19 +302,21 @@ export const scriptService = {
   // Atualizar script
   async update(id: string, data: Partial<CreateScriptData>): Promise<void> {
     if (isBaserowAvailable()) {
-      const updateData: any = {};
-      if (data.script) updateData.field_5701039 = data.script;
-      if (data.title) updateData.field_5701040 = data.title;
-      if (data.clientName) updateData.field_5701038 = data.clientName;
-      
-      await baserowRequest(`/api/database/rows/table/${BASEROW_CONFIG.tables.scripts}/${id}/`, {
-        method: 'PATCH',
-        body: JSON.stringify(updateData)
-      });
-      return;
+      try {
+        const updateData: any = {};
+        if (data.script) updateData.field_5701039 = data.script;
+        if (data.title) updateData.field_5701040 = data.title;
+        if (data.clientName) updateData.field_5701038 = data.clientName;
+        await baserowRequest(`/api/database/rows/table/${BASEROW_CONFIG.tables.scripts}/${id}/`, {
+          method: 'PATCH',
+          body: JSON.stringify(updateData)
+        });
+        return;
+      } catch (e) {
+        console.warn('[scriptService.update] Falha Baserow, fallback local:', e);
+      }
     }
-    
-    // Local fallback
+
     const scripts = localStorage_utils.getScripts();
     const index = scripts.findIndex(s => s.id === id);
     if (index !== -1) {
@@ -316,13 +328,16 @@ export const scriptService = {
   // Deletar script
   async delete(id: string): Promise<void> {
     if (isBaserowAvailable()) {
-      await baserowRequest(`/api/database/rows/table/${BASEROW_CONFIG.tables.scripts}/${id}/`, {
-        method: 'DELETE'
-      });
-      return;
+      try {
+        await baserowRequest(`/api/database/rows/table/${BASEROW_CONFIG.tables.scripts}/${id}/`, {
+          method: 'DELETE'
+        });
+        return;
+      } catch (e) {
+        console.warn('[scriptService.delete] Falha Baserow, fallback local:', e);
+      }
     }
-    
-    // Local fallback
+
     const scripts = localStorage_utils.getScripts();
     const filtered = scripts.filter(s => s.id !== id);
     localStorage_utils.saveScripts(filtered);

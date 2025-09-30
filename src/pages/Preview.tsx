@@ -153,68 +153,57 @@ const Preview = () => {
       const scriptTags = tempDiv.getElementsByTagName("script");
       
       if (scriptTags.length === 0) {
-        throw new Error("Nenhum script válido encontrado");
+        throw new Error("Nenhum <script> encontrado no código fornecido");
       }
 
-      const scriptContent = scriptTags[0].textContent || scriptTags[0].innerHTML;
-      if (!scriptContent.trim()) {
-        throw new Error("Script vazio");
-      }
+      const firstTag = scriptTags[0];
+      const hasSrc = firstTag.getAttribute('src');
+      const scriptContent = firstTag.textContent || firstTag.innerHTML || '';
 
-      // Desabilita showChatPopup globalmente
-      (window as any).showChatPopup = false;
-      (window as any).disablePopup = true;
+      console.log("Injetando script do widget... (externo:", !!hasSrc, ")");
 
-      // Cria novo elemento script
-      const scriptElement = document.createElement("script");
+      const scriptElement = document.createElement('script');
       scriptElement.id = WIDGET_SCRIPT_ID;
-      scriptElement.type = "text/javascript";
-      
-      // Wrappa o script para controle total
-      scriptElement.text = `
-        (function() {
-          console.log("Iniciando widget de chat...");
-          
-          // Desabilita qualquer popup
-          window.showChatPopup = false;
-          window.disablePopup = true;
-          
-          try {
-            ${scriptContent}
-            console.log("Widget injetado com sucesso");
-            
-            // Remove qualquer popup que apareça
-            const removeAllPopups = () => {
-              document.querySelectorAll('[role="dialog"], .dialog, .modal, [class*="popup"], [class*="z-\\["]').forEach(el => {
-                const text = (el.textContent || '').toLowerCase();
-                if (text.includes('chat ativo') || text.includes('widget carregado') || text.includes('criar novo')) {
-                  el.style.display = 'none';
-                  el.remove();
-                }
-              });
-            };
-            
-            // Remove popups imediatamente e em intervalos
-            removeAllPopups();
-            setTimeout(removeAllPopups, 100);
-            setTimeout(removeAllPopups, 500);
-            setTimeout(removeAllPopups, 1000);
-            setTimeout(removeAllPopups, 2000);
-            
-          } catch (e) {
-            console.error("Erro ao executar script do widget:", e);
+      scriptElement.type = 'text/javascript';
+      scriptElement.setAttribute('data-chatbot-injected', 'true');
+
+      if (hasSrc) {
+        // Copia atributos relevantes
+        Array.from(firstTag.attributes).forEach(attr => {
+          if (!['id'].includes(attr.name)) {
+            scriptElement.setAttribute(attr.name, attr.value);
           }
-        })();
-      `;
+        });
+        scriptElement.onload = () => {
+          console.log('Script externo carregado');
+          finalizarInjecao();
+        };
+        scriptElement.onerror = () => {
+          console.error('Falha ao carregar script externo');
+          finalizarInjecao();
+        };
+      } else {
+        if (!scriptContent.trim()) throw new Error('Script vazio');
+        scriptElement.text = scriptContent;
+      }
+
+      const finalizarInjecao = () => {
+        setTimeout(() => {
+          removerPopupsEBranding();
+          reinjetandoRef.current = false;
+          setIsLoading(false);
+          const widget = document.getElementById('ra_wc_chatbot') ||
+            document.querySelector('[id*="chatbot"]') ||
+            document.querySelector('[class*="chatbot"]');
+          if (widget) console.log('Widget encontrado:', widget);
+          else console.warn('Widget não encontrado após injeção');
+        }, 1500);
+      };
 
       document.head.appendChild(scriptElement);
-      
-      // Remove popups após execução
-      setTimeout(() => {
-        removerPopupsEBranding();
-        reinjetandoRef.current = false;
-        setIsLoading(false);
-      }, 2000);
+      if (!hasSrc) {
+        finalizarInjecao();
+      }
 
     } catch (err) {
       console.error("Erro ao injetar widget:", err);
@@ -342,262 +331,6 @@ const Preview = () => {
     return () => clearInterval(interval);
   }, [removerPopupsEBranding]);
 
-  const injectChatbotScript = async (scriptContent: string) => {
-    // Extract script content from the stored script
-    const tempDiv = document.createElement("div");
-    tempDiv.innerHTML = scriptContent;
-    
-    const scriptTags = tempDiv.getElementsByTagName("script");
-    if (scriptTags.length === 0) {
-      setError("Nenhum script válido encontrado. Verifique o código colado.");
-      setIsLoading(false);
-      return;
-    }
-
-    // Get the script content
-    const scriptTextContent = scriptTags[0].textContent || scriptTags[0].innerHTML;
-    
-    if (!scriptTextContent.trim()) {
-      setError("Script vazio. Por favor, cole um script válido.");
-      setIsLoading(false);
-      return;
-    }
-
-    console.log("Script encontrado, preparando para injetar...");
-    console.log("Conteúdo do script:", scriptTextContent.substring(0, 200) + "...");
-
-    // Wait for DOM to be fully ready
-    const injectScript = () => {
-      try {
-        // Create and inject the script element directly into the DOM
-        const scriptElement = document.createElement("script");
-        scriptElement.type = "text/javascript";
-        scriptElement.setAttribute("data-chatbot-injected", "true");
-        
-        // Monitor network requests to help debug 400 errors
-        const originalFetch = window.fetch;
-        window.fetch = function(...args) {
-          console.log("Fetch request:", args[0]);
-          return originalFetch.apply(this, args).catch(err => {
-            console.error("Fetch error:", err);
-            return Promise.reject(err);
-          });
-        };
-        
-        // Override XMLHttpRequest to monitor older AJAX requests
-        const originalXHR = window.XMLHttpRequest.prototype.open;
-        window.XMLHttpRequest.prototype.open = function(method, url, ...rest) {
-          console.log("XHR request:", method, url);
-          this.addEventListener('error', (e) => {
-            console.error("XHR error:", e, "URL:", url);
-          });
-          this.addEventListener('load', () => {
-            if (this.status >= 400) {
-              console.error("XHR HTTP error:", this.status, this.statusText, "URL:", url);
-              console.error("Response:", this.responseText);
-            }
-          });
-          return originalXHR.call(this, method, url, ...rest);
-        };
-        
-        // Wrap the script content to ensure it runs in the correct context
-        scriptElement.text = `
-          (function() {
-            console.log("Executando script do chatbot...");
-            console.log("User Agent:", navigator.userAgent);
-            console.log("Current domain:", window.location.hostname);
-            console.log("Protocol:", window.location.protocol);
-            
-            // Tentar mascarar o referrer para contornar restrições de domínio
-            try {
-              Object.defineProperty(document, 'referrer', {
-                value: '',
-                writable: false
-              });
-            } catch (e) {
-              console.log("Não foi possível mascarar o referrer:", e);
-            }
-            
-            // Modificar window.location temporariamente para alguns casos
-            const originalLocation = window.location;
-            
-            try {
-              // Executar o script original
-              ${scriptTextContent}
-              console.log("Script do chatbot executado com sucesso");
-              
-              // Aguardar um pouco e tentar forçar a criação do widget se não existir
-              setTimeout(() => {
-                const widget = document.getElementById("ra_wc_chatbot");
-                if (!widget) {
-                  console.log("Widget não encontrado, tentando abordagem alternativa...");
-                  
-                  // Tentar encontrar e executar funções do chatbot globalmente
-                  if (window.ra_chatbot_init) {
-                    console.log("Tentando executar ra_chatbot_init...");
-                    window.ra_chatbot_init();
-                  }
-                  
-                  // Verificar se há outras funções relacionadas
-                  Object.keys(window).forEach(key => {
-                    if (key.includes('chatbot') || key.includes('widget')) {
-                      console.log("Função relacionada encontrada:", key, typeof window[key]);
-                    }
-                  });
-                }
-              }, 1000);
-              
-            } catch (e) {
-              console.error("Erro ao executar script do chatbot:", e);
-              console.error("Stack trace:", e.stack);
-              
-              // Em caso de erro, tentar uma abordagem mais simples
-              console.log("Tentando abordagem de fallback...");
-              try {
-                // Criar uma versão simplificada do widget se o original falhar
-                const fallbackWidget = document.createElement('div');
-                fallbackWidget.id = 'ra_wc_chatbot_fallback';
-                fallbackWidget.innerHTML = \`
-                  <div style="position: fixed; bottom: 20px; right: 20px; z-index: 9999; 
-                              background: #0066cc; color: white; padding: 12px 20px; 
-                              border-radius: 25px; cursor: pointer; font-family: Arial, sans-serif;
-                              box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
-                    ⚠️ Widget bloqueado por CORS
-                    <div style="font-size: 11px; margin-top: 4px; opacity: 0.9;">
-                      Adicione \${window.location.origin} nos domínios permitidos
-                    </div>
-                  </div>
-                \`;
-                document.body.appendChild(fallbackWidget);
-                
-                fallbackWidget.addEventListener('click', () => {
-                  alert('Este widget não pode ser carregado devido a restrições de CORS.\\n\\nPara resolver:\\n1. Acesse as configurações do chatbot\\n2. Adicione o domínio: ' + window.location.origin + '\\n3. Salve e teste novamente');
-                });
-                
-              } catch (fallbackError) {
-                console.error("Erro no fallback:", fallbackError);
-              }
-            }
-          })();
-        `;
-        
-        // Add script to document head for better compatibility
-        document.head.appendChild(scriptElement);
-        console.log("Script injetado no DOM");
-        
-        // Check if widget was created after a delay and show popup
-        setTimeout(() => {
-          const widget = document.getElementById("ra_wc_chatbot");
-          const fallbackWidget = document.getElementById("ra_wc_chatbot_fallback");
-          
-          if (widget) {
-            console.log("Widget encontrado no DOM:", widget);
-            // Mostrar popup de destaque
-            setShowChatPopup(true);
-          } else if (fallbackWidget) {
-            console.log("Widget de fallback criado devido a restrições CORS");
-            setShowChatPopup(true);
-          } else {
-            console.warn("Widget não foi criado. Tentando iframe como última alternativa...");
-            
-            // Criar iframe como última tentativa
-            try {
-              const iframe = document.createElement('iframe');
-              iframe.style.cssText = `
-                position: fixed;
-                bottom: 20px;
-                right: 20px;
-                width: 60px;
-                height: 60px;
-                border: none;
-                border-radius: 50%;
-                z-index: 9999;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-              `;
-              iframe.srcdoc = `
-                <!DOCTYPE html>
-                <html>
-                <head>
-                  <style>
-                    body { margin: 0; padding: 0; overflow: hidden; }
-                    .chat-button {
-                      width: 60px; height: 60px;
-                      background: linear-gradient(135deg, #0066cc, #004499);
-                      border-radius: 50%;
-                      display: flex;
-                      align-items: center;
-                      justify-content: center;
-                      cursor: pointer;
-                      color: white;
-                      font-size: 24px;
-                      transition: transform 0.2s;
-                    }
-                    .chat-button:hover { transform: scale(1.1); }
-                  </style>
-                </head>
-                <body>
-                  <div class="chat-button" onclick="parent.postMessage('openChat', '*')">💬</div>
-                </body>
-                </html>
-              `;
-              
-              // Adicionar listener para mensagens do iframe
-              window.addEventListener('message', (event) => {
-                if (event.data === 'openChat') {
-                  alert('Widget de Chatbot\\n\\nEste é um botão de demonstração.\\n\\nO chatbot original está bloqueado por CORS.\\n\\nPara resolver, adicione o domínio:\\n' + window.location.origin + '\\n\\nnas configurações do chatbot.');
-                }
-              });
-              
-              document.body.appendChild(iframe);
-              console.log("Iframe de demonstração criado");
-              setShowChatPopup(true);
-            } catch (iframeError) {
-              console.error("Erro ao criar iframe:", iframeError);
-            }
-            
-            // Try to find any chatbot-related elements
-            const chatbotElements = document.querySelectorAll('[id*="chatbot"], [class*="chatbot"], [id*="chat"], [class*="chat"]');
-            if (chatbotElements.length > 0) {
-              console.log("Elementos relacionados ao chatbot encontrados:", chatbotElements);
-            }
-          }
-          setIsLoading(false);
-        }, 3000);
-
-        // Cleanup function
-        return () => {
-          console.log("Limpando script e widget...");
-          // Remove the script element
-          if (scriptElement.parentNode) {
-            scriptElement.parentNode.removeChild(scriptElement);
-          }
-          
-          // Remove the chatbot widget if it exists
-          const widget = document.getElementById("ra_wc_chatbot");
-          if (widget && widget.parentNode) {
-            widget.parentNode.removeChild(widget);
-          }
-          
-          // Remove any additional scripts that may have been loaded
-          const injectedScripts = document.querySelectorAll('script[id^="ra_chatbot"]');
-          injectedScripts.forEach(script => {
-            if (script.parentNode) {
-              script.parentNode.removeChild(script);
-            }
-          });
-        };
-      } catch (err) {
-        console.error("Erro ao injetar script:", err);
-        setError(`Erro ao injetar o script: ${err instanceof Error ? err.message : "Erro desconhecido"}`);
-        setIsLoading(false);
-      }
-    };
-
-    // Execute after a short delay to ensure DOM is ready
-    const cleanup = injectScript();
-    return cleanup;
-  };
-
   if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
@@ -619,23 +352,11 @@ const Preview = () => {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
         <div className="text-center space-y-4">
-          <div className="inline-block p-4 bg-card rounded-full shadow-[var(--shadow-elegant)] mb-4">
-            <svg
-              className="w-8 h-8 text-primary animate-pulse"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
-              />
-            </svg>
+          <div className="inline-block p-4 bg-card rounded-full shadow-lg mb-4">
+            <MessageCircle className="w-8 h-8 text-primary animate-pulse" />
           </div>
-          <h1 className="text-2xl font-bold text-foreground">Carregando Chatbot...</h1>
-          <p className="text-muted-foreground">O widget será exibido em instantes</p>
+          <h1 className="text-2xl font-bold text-foreground">Carregando Widget...</h1>
+          <p className="text-muted-foreground">Preparando chatbot</p>
         </div>
       </div>
     );
@@ -646,40 +367,47 @@ const Preview = () => {
       {/* Header */}
       <div className="p-4 border-b">
         <Button 
-          onClick={handleNewChat}
+          onClick={criarNovoWidget}
           className="w-full justify-start gap-2 bg-primary hover:bg-primary/90"
         >
           <Edit3 className="w-4 h-4" />
-          Start New chat
+          Nova conversa
         </Button>
       </div>
 
-      {/* Conversations List */}
+      {/* Widgets List */}
       <div className="flex-1 overflow-hidden">
         <div className="p-4">
-          <h3 className="text-sm font-medium text-muted-foreground mb-3">New conversation</h3>
+          <h3 className="text-sm font-medium text-muted-foreground mb-3">Histórico</h3>
         </div>
         
         <ScrollArea className="flex-1 px-2">
           <div className="space-y-1">
-            {conversations.map((conversation) => (
+            {widgetsArquivados.length === 0 && (
+              <div className="text-center text-sm text-muted-foreground p-4">
+                Nenhum widget arquivado
+              </div>
+            )}
+            {widgetsArquivados.map((widget) => (
               <div
-                key={conversation.id}
+                key={widget.id}
                 className={`group relative flex items-center gap-3 rounded-lg p-3 cursor-pointer transition-colors ${
-                  conversation.isActive 
+                  widget.isActive 
                     ? 'bg-secondary' 
                     : 'hover:bg-secondary/50'
                 }`}
-                onClick={() => handleSelectConversation(conversation.id)}
+                onClick={() => selecionarWidget(widget.id)}
               >
                 <MessageCircle className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{conversation.title}</p>
-                  <p className="text-xs text-muted-foreground truncate">{conversation.lastMessage}</p>
+                  <p className="text-sm font-medium truncate">{widget.titulo}</p>
+                  <p className="text-xs text-muted-foreground truncate">
+                    ID: {widget.id.substring(0, 8)}...
+                  </p>
                 </div>
                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                   <span className="text-xs text-muted-foreground">
-                    {formatTimestamp(conversation.timestamp)}
+                    {formatarTempo(widget.criadoEm)}
                   </span>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -691,7 +419,7 @@ const Preview = () => {
                       <DropdownMenuItem 
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleDeleteConversation(conversation.id);
+                          deletarWidget(widget.id);
                         }}
                         className="text-destructive"
                       >
@@ -707,18 +435,17 @@ const Preview = () => {
         </ScrollArea>
       </div>
 
-      {/* Footer */}
+      {/* Footer sem Dify */}
       <div className="p-4 border-t">
-        <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <span>POWERED BY</span>
-          <span className="font-semibold">Dify</span>
+        <div className="text-xs text-muted-foreground text-center">
+          Preview de Chat
         </div>
       </div>
     </div>
   );
 
   return (
-    <div className="min-h-screen flex bg-background" style={{ position: 'relative', zIndex: 1 }}>
+    <div className="min-h-screen flex bg-background">
       {/* Desktop Sidebar */}
       <div className="hidden lg:flex w-80 border-r bg-card/50">
         <SidebarContent />
@@ -742,8 +469,8 @@ const Preview = () => {
               </Button>
             </SheetTrigger>
           </Sheet>
-          <h1 className="text-lg font-semibold">Talk to DEV - TALKA</h1>
-          <div className="w-9" /> {/* Spacer */}
+          <h1 className="text-lg font-semibold">Preview do Chat</h1>
+          <div className="w-9" />
         </div>
 
         {/* Chat Area */}
@@ -755,7 +482,7 @@ const Preview = () => {
                 <MessageCircle className="w-8 h-8 text-primary" />
               </div>
               <div className="space-y-2">
-                <h2 className="text-2xl font-bold text-foreground">Talk to DEV - TALKA</h2>
+                <h2 className="text-2xl font-bold text-foreground">Preview do Chat</h2>
                 <p className="text-muted-foreground">
                   O widget do chatbot aparecerá no canto inferior direito
                 </p>
@@ -767,9 +494,9 @@ const Preview = () => {
               <div className="bg-card/50 rounded-lg p-4 border border-border/50">
                 <h3 className="font-medium mb-2">Status do Widget</h3>
                 <div className="text-sm text-muted-foreground space-y-1">
-                  <p>• Widget carregando...</p>
-                  <p>• Aguarde alguns segundos</p>
-                  <p>• Verifique o console (F12) para logs</p>
+                  <p>• Widget carregado e pronto</p>
+                  <p>• Popups automáticos removidos</p>
+                  <p>• Interface limpa</p>
                 </div>
               </div>
               
@@ -785,28 +512,25 @@ const Preview = () => {
               </div>
             </div>
 
-            {/* CORS Warning */}
+            {/* Instructions */}
             <div className="bg-amber-50 dark:bg-amber-950/50 rounded-lg p-4 border border-amber-200 dark:border-amber-800">
               <div className="flex items-start gap-3">
-                <div className="text-amber-600 dark:text-amber-400 mt-0.5">⚠️</div>
+                <div className="text-amber-600 dark:text-amber-400 mt-0.5">💡</div>
                 <div className="flex-1">
                   <h3 className="font-medium text-amber-800 dark:text-amber-200 mb-1">
-                    Configuração de Domínio
+                    Como usar
                   </h3>
-                  <p className="text-sm text-amber-700 dark:text-amber-300 mb-2">
-                    Para o chatbot funcionar corretamente, adicione este domínio nas configurações:
-                  </p>
-                  <code className="bg-amber-100 dark:bg-amber-900 px-2 py-1 rounded text-xs">
-                    {window.location.origin}
-                  </code>
+                  <div className="text-sm text-amber-700 dark:text-amber-300 space-y-1">
+                    <p>• O widget aparece automaticamente no canto inferior direito</p>
+                    <p>• Use "Nova conversa" na sidebar para reiniciar o chat</p>
+                    <p>• O histórico de widgets fica salvo na sidebar</p>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
         </div>
       </div>
-
-      {/* Chat Popup em Destaque - REMOVIDO COMPLETAMENTE */}
     </div>
   );
 };
