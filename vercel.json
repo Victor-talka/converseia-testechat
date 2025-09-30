@@ -1,5 +1,4 @@
 {
-  "_comment": "Configuração atualizada para nova interface de preview",
   "rewrites": [
     { "source": "/(.*)", "destination": "/" }
   ],
