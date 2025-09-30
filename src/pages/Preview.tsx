@@ -1,21 +1,26 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { AlertCircle, MessageCircle, X, Plus, Menu, Edit3, MoreHorizontal, Trash2 } from "lucide-react";
+import { AlertCircle, MessageCircle, Menu, Edit3, MoreHorizontal, Trash2 } from "lucide-react";
 import { scriptService } from "@/services/database";
 import { ChatScript } from "@/types/database";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 
-// Tipo para as conversas do histórico
-type Conversation = {
+// Configurações do widget
+const WIDGET_SCRIPT_ID = 'ra-chatbot-widget';
+const WIDGET_IFRAME_SELECTOR = 'iframe[src*="chatbot"], iframe#ra_wc_chatbot';
+const CONVERSATION_STORAGE_KEY = 'chatbot_conversation_id';
+const WIDGETS_STORAGE_KEY = 'preview_widgets_historico';
+
+// Tipo para widgets arquivados
+type WidgetArquivado = {
   id: string;
-  title: string;
-  lastMessage: string;
-  timestamp: Date;
+  titulo: string;
+  criadoEm: number;
+  ultimaAtualizacao: number;
   isActive?: boolean;
 };
 
@@ -26,78 +31,252 @@ const Preview = () => {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [scriptData, setScriptData] = useState<ChatScript | null>(null);
-  const [showChatPopup, setShowChatPopup] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [conversations, setConversations] = useState<Conversation[]>([
-    {
-      id: "1",
-      title: "Procurando Exemplo História...",
-      lastMessage: "Olá! Como posso ajudar você hoje?",
-      timestamp: new Date(Date.now() - 1000 * 60 * 5), // 5 minutos atrás
-      isActive: true
-    },
-    {
-      id: "2",
-      title: "Suporte Técnico",
-      lastMessage: "Entendi o problema, vou verificar...",
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2), // 2 horas atrás
-    },
-    {
-      id: "3",
-      title: "Informações sobre Produto",
-      lastMessage: "Obrigado pelas informações!",
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24), // 1 dia atrás
+  const [widgetsArquivados, setWidgetsArquivados] = useState<WidgetArquivado[]>([]);
+  const reinjetandoRef = useRef(false);
+
+  // Carrega widgets arquivados do localStorage
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(WIDGETS_STORAGE_KEY);
+      if (raw) setWidgetsArquivados(JSON.parse(raw));
+    } catch {
+      // ignore
     }
-  ]);
+  }, []);
 
-  const handleNewChat = () => {
-    const newConversation: Conversation = {
-      id: Date.now().toString(),
-      title: "Nova conversa",
-      lastMessage: "Iniciando nova conversa...",
-      timestamp: new Date(),
-      isActive: true
+  const persistirWidgets = (lista: WidgetArquivado[]) => {
+    setWidgetsArquivados(lista);
+    try {
+      localStorage.setItem(WIDGETS_STORAGE_KEY, JSON.stringify(lista));
+    } catch {
+      // ignore
+    }
+  };
+
+  // Remove todos os popups e elementos indesejados
+  const removerPopupsEBranding = useCallback(() => {
+    const remover = () => {
+      // Remove popups "Chat Ativo" e similares
+      document.querySelectorAll('[role="dialog"], .dialog, .modal, [class*="popup"], [class*="z-\\["]').forEach((el) => {
+        const element = el as HTMLElement;
+        const text = (element.textContent || '').toLowerCase();
+        
+        if (text.includes('chat ativo') || 
+            text.includes('widget de chat carregado') || 
+            text.includes('chat carregado') ||
+            text.includes('cliente:') ||
+            text.includes('fechar e usar chat') ||
+            text.includes('criar novo')) {
+          element.style.display = 'none';
+          element.remove();
+        }
+      });
+
+      // Remove backdrop/overlay dos modals
+      document.querySelectorAll('[class*="backdrop"], [class*="overlay"], [class*="bg-black"]').forEach((el) => {
+        const element = el as HTMLElement;
+        const style = window.getComputedStyle(element);
+        if (style.position === 'fixed' && (style.zIndex === '10000' || parseInt(style.zIndex) > 9999)) {
+          element.style.display = 'none';
+          element.remove();
+        }
+      });
+
+      // Remove branding Dify
+      document.querySelectorAll('*').forEach(el => {
+        const txt = (el.textContent || '').trim().toLowerCase();
+        if (txt === 'powered by dify' || txt === 'dify') {
+          (el as HTMLElement).style.display = 'none';
+        }
+      });
+
+      // Remove botões "Criar Novo" que não sejam da sidebar
+      document.querySelectorAll('button').forEach(btn => {
+        const text = (btn.textContent || '').toLowerCase();
+        if (text === 'criar novo' && !btn.closest('.sidebar, [data-sidebar]')) {
+          btn.style.display = 'none';
+        }
+      });
     };
-    
-    setConversations(prev => [
-      newConversation,
-      ...prev.map(conv => ({ ...conv, isActive: false }))
-    ]);
-    
-    toast({
-      title: "Nova conversa iniciada",
-      description: "Uma nova conversa foi criada com sucesso."
-    });
-  };
 
-  const handleSelectConversation = (convId: string) => {
-    setConversations(prev => 
-      prev.map(conv => ({ 
-        ...conv, 
-        isActive: conv.id === convId 
-      }))
-    );
+    remover();
+
+    // Observer para remover popups que aparecem dinamicamente
+    if (!(window as any).__popup_remover_observer__) {
+      const observer = new MutationObserver(() => {
+        setTimeout(remover, 50);
+      });
+      observer.observe(document.body, { 
+        childList: true, 
+        subtree: true, 
+        attributes: true,
+        attributeFilter: ['style', 'class']
+      });
+      (window as any).__popup_remover_observer__ = observer;
+    }
+  }, []);
+
+  // Arquiva widget atual antes de criar novo
+  const arquivarWidgetAtual = useCallback(() => {
+    const idAtual = localStorage.getItem(CONVERSATION_STORAGE_KEY);
+    if (!idAtual) return;
+    if (widgetsArquivados.some(w => w.id === idAtual)) return;
+
+    const novo: WidgetArquivado = {
+      id: idAtual,
+      titulo: `Widget ${widgetsArquivados.length + 1}`,
+      criadoEm: Date.now(),
+      ultimaAtualizacao: Date.now()
+    };
+    const lista = [novo, ...widgetsArquivados.map(w => ({ ...w, isActive: false }))];
+    persistirWidgets(lista);
+  }, [widgetsArquivados]);
+
+  // Injeta o script do widget sem mostrar popup
+  const injetarWidget = useCallback(async () => {
+    if (reinjetandoRef.current) return;
+    reinjetandoRef.current = true;
+
+    try {
+      // Remove widgets anteriores
+      const oldScript = document.getElementById(WIDGET_SCRIPT_ID);
+      if (oldScript) oldScript.remove();
+      document.querySelectorAll(WIDGET_IFRAME_SELECTOR).forEach(el => el.remove());
+      document.querySelectorAll('[id*="ra_wc_chatbot"]').forEach(el => el.remove());
+
+      if (!scriptData) return;
+
+      // Extrai conteúdo do script
+      const tempDiv = document.createElement("div");
+      tempDiv.innerHTML = scriptData.script;
+      const scriptTags = tempDiv.getElementsByTagName("script");
+      
+      if (scriptTags.length === 0) {
+        throw new Error("Nenhum script válido encontrado");
+      }
+
+      const scriptContent = scriptTags[0].textContent || scriptTags[0].innerHTML;
+      if (!scriptContent.trim()) {
+        throw new Error("Script vazio");
+      }
+
+      // Desabilita showChatPopup globalmente
+      (window as any).showChatPopup = false;
+      (window as any).disablePopup = true;
+
+      // Cria novo elemento script
+      const scriptElement = document.createElement("script");
+      scriptElement.id = WIDGET_SCRIPT_ID;
+      scriptElement.type = "text/javascript";
+      
+      // Wrappa o script para controle total
+      scriptElement.text = `
+        (function() {
+          console.log("Iniciando widget de chat...");
+          
+          // Desabilita qualquer popup
+          window.showChatPopup = false;
+          window.disablePopup = true;
+          
+          try {
+            ${scriptContent}
+            console.log("Widget injetado com sucesso");
+            
+            // Remove qualquer popup que apareça
+            const removeAllPopups = () => {
+              document.querySelectorAll('[role="dialog"], .dialog, .modal, [class*="popup"], [class*="z-\\["]').forEach(el => {
+                const text = (el.textContent || '').toLowerCase();
+                if (text.includes('chat ativo') || text.includes('widget carregado') || text.includes('criar novo')) {
+                  el.style.display = 'none';
+                  el.remove();
+                }
+              });
+            };
+            
+            // Remove popups imediatamente e em intervalos
+            removeAllPopups();
+            setTimeout(removeAllPopups, 100);
+            setTimeout(removeAllPopups, 500);
+            setTimeout(removeAllPopups, 1000);
+            setTimeout(removeAllPopups, 2000);
+            
+          } catch (e) {
+            console.error("Erro ao executar script do widget:", e);
+          }
+        })();
+      `;
+
+      document.head.appendChild(scriptElement);
+      
+      // Remove popups após execução
+      setTimeout(() => {
+        removerPopupsEBranding();
+        reinjetandoRef.current = false;
+        setIsLoading(false);
+      }, 2000);
+
+    } catch (err) {
+      console.error("Erro ao injetar widget:", err);
+      setError(`Erro ao carregar widget: ${err instanceof Error ? err.message : "Erro desconhecido"}`);
+      reinjetandoRef.current = false;
+      setIsLoading(false);
+    }
+  }, [scriptData, removerPopupsEBranding]);
+
+  // Cria novo widget
+  const criarNovoWidget = () => {
+    arquivarWidgetAtual();
+    localStorage.removeItem(CONVERSATION_STORAGE_KEY);
+    
+    // Força reload para limpar estado
+    setIsLoading(true);
+    injetarWidget();
     setSidebarOpen(false);
-  };
-
-  const handleDeleteConversation = (convId: string) => {
-    setConversations(prev => prev.filter(conv => conv.id !== convId));
+    
     toast({
-      title: "Conversa deletada",
-      description: "A conversa foi removida com sucesso."
+      title: "Novo widget criado",
+      description: "Um novo widget de chat foi inicializado."
     });
   };
 
-  const formatTimestamp = (date: Date) => {
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    const minutes = Math.floor(diff / (1000 * 60));
-    const hours = Math.floor(diff / (1000 * 60 * 60));
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  // Seleciona widget arquivado
+  const selecionarWidget = (widgetId: string) => {
+    const lista = widgetsArquivados.map(w => ({ 
+      ...w, 
+      isActive: w.id === widgetId 
+    }));
+    persistirWidgets(lista);
+    setSidebarOpen(false);
+    
+    toast({
+      title: "Widget selecionado",
+      description: "Widget anterior reativado."
+    });
+  };
 
-    if (minutes < 60) return `${minutes}m`;
-    if (hours < 24) return `${hours}h`;
-    return `${days}d`;
+  // Deleta widget
+  const deletarWidget = (widgetId: string) => {
+    const lista = widgetsArquivados.filter(w => w.id !== widgetId);
+    persistirWidgets(lista);
+    
+    toast({
+      title: "Widget removido",
+      description: "Widget deletado do histórico."
+    });
+  };
+
+  // Formata timestamp
+  const formatarTempo = (timestamp: number) => {
+    const agora = Date.now();
+    const diff = agora - timestamp;
+    const minutos = Math.floor(diff / (1000 * 60));
+    const horas = Math.floor(diff / (1000 * 60 * 60));
+    const dias = Math.floor(diff / (1000 * 60 * 60 * 24));
+
+    if (minutos < 60) return `${minutos}m`;
+    if (horas < 24) return `${horas}h`;
+    return `${dias}d`;
   };
 
   useEffect(() => {
@@ -109,16 +288,14 @@ const Preview = () => {
 
     const loadScript = async () => {
       try {
-        // Tentar buscar do banco de dados primeiro
         const script = await scriptService.getById(id);
         
         if (script) {
           setScriptData(script);
-          await injectChatbotScript(script.script);
           return;
         }
 
-        // Fallback para localStorage (compatibilidade com versão anterior)
+        // Fallback localStorage
         const storedScripts = localStorage.getItem("chatbot-scripts");
         if (!storedScripts) {
           setError("Script não encontrado. O link pode estar expirado.");
@@ -130,12 +307,15 @@ const Preview = () => {
         const localScript = scripts[id];
         
         if (!localScript) {
-          setError("Script não encontrado para este ID. O link pode estar expirado.");
+          setError("Script não encontrado para este ID.");
           setIsLoading(false);
           return;
         }
 
-        await injectChatbotScript(localScript.script);
+        setScriptData({
+          ...localScript,
+          script: localScript.script
+        });
       } catch (err) {
         console.error("Error loading script:", err);
         setError(`Erro ao carregar o script: ${err instanceof Error ? err.message : "Erro desconhecido"}`);
@@ -145,6 +325,22 @@ const Preview = () => {
 
     loadScript();
   }, [id]);
+
+  // Injeta widget quando script carrega
+  useEffect(() => {
+    if (scriptData && !reinjetandoRef.current) {
+      injetarWidget();
+    }
+  }, [scriptData, injetarWidget]);
+
+  // Aplica limpeza contínua
+  useEffect(() => {
+    const interval = setInterval(() => {
+      removerPopupsEBranding();
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [removerPopupsEBranding]);
 
   const injectChatbotScript = async (scriptContent: string) => {
     // Extract script content from the stored script
@@ -610,68 +806,7 @@ const Preview = () => {
         </div>
       </div>
 
-      {/* Chat Popup em Destaque */}
-      {showChatPopup && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[10000] p-4">
-          <div className="bg-card rounded-2xl shadow-2xl max-w-md w-full border border-border overflow-hidden">
-            <div className="bg-primary text-primary-foreground p-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <MessageCircle className="w-6 h-6" />
-                <div>
-                  <h3 className="font-semibold">Chat Ativo!</h3>
-                  {scriptData && (
-                    <p className="text-xs opacity-90">Cliente: {scriptData.clientName}</p>
-                  )}
-                </div>
-              </div>
-              <button
-                onClick={() => setShowChatPopup(false)}
-                className="text-primary-foreground/80 hover:text-primary-foreground transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="p-6 space-y-4">
-              <div className="text-center">
-                <div className="w-16 h-16 bg-green-100 dark:bg-green-900/50 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <MessageCircle className="w-8 h-8 text-green-600 dark:text-green-400" />
-                </div>
-                <h4 className="text-lg font-semibold text-foreground mb-2">
-                  Widget de Chat Carregado!
-                </h4>
-                <p className="text-sm text-muted-foreground mb-4">
-                  O widget de chat está funcionando e pronto para uso. Você pode fechar este popup e interagir com o chat no canto da tela.
-                </p>
-              </div>
-              
-              <div className="bg-secondary/30 rounded-lg p-4">
-                <h5 className="font-medium text-sm mb-2">🎯 Como usar:</h5>
-                <ul className="text-xs text-muted-foreground space-y-1">
-                  <li>• O widget aparece no canto inferior direito</li>
-                  <li>• Clique para abrir a conversa</li>
-                  <li>• Teste todas as funcionalidades</li>
-                  <li>• Compartilhe o link para demonstrações</li>
-                </ul>
-              </div>
-
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowChatPopup(false)}
-                  className="flex-1 bg-primary text-primary-foreground py-2 px-4 rounded-lg font-medium hover:bg-primary/90 transition-colors"
-                >
-                  Fechar e Usar Chat
-                </button>
-                <button
-                  onClick={() => window.location.href = '/'}
-                  className="flex-1 bg-secondary text-secondary-foreground py-2 px-4 rounded-lg font-medium hover:bg-secondary/80 transition-colors"
-                >
-                  Criar Novo
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Chat Popup em Destaque - REMOVIDO COMPLETAMENTE */}
     </div>
   );
 };
