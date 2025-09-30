@@ -43,8 +43,10 @@ const localStorage_utils = {
     localStorage.setItem(STORAGE_KEYS.scripts, JSON.stringify(scripts));
   },
   
+  // FIX 2: Gerar um ID numérico para compatibilidade com o Baserow
   generateId(): string {
-    return Date.now().toString(36) + Math.random().toString(36).substring(2);
+    // Gera um ID baseado no tempo e um número aleatório, garantindo que seja numérico.
+    return String(Date.now() + Math.floor(Math.random() * 1000));
   }
 };
 
@@ -110,7 +112,8 @@ export const clientService = {
   async getAll(): Promise<Client[]> {
     if (isBaserowAvailable()) {
       try {
-        const response = await baserowRequest(`/api/database/rows/table/${BASEROW_CONFIG.tables.clients}/?order_by=-created_on`);
+        // FIX 1: Removido '?order_by=-created_on' para evitar Bad Request
+        const response = await baserowRequest(`/api/database/rows/table/${BASEROW_CONFIG.tables.clients}/`);
         return response.results.map(mapBaserowClient);
       } catch (error) {
         console.error('Erro ao buscar clientes no Baserow, usando localStorage:', error);
@@ -183,6 +186,7 @@ export const scriptService = {
         const response = await baserowRequest(`/api/database/rows/table/${BASEROW_CONFIG.tables.scripts}/`, {
           method: 'POST',
           body: JSON.stringify({
+            // parseInt é seguro agora por causa do FIX 2
             client_id: parseInt(data.clientId),
             client_name: data.clientName,
             script: data.script,
@@ -218,7 +222,8 @@ export const scriptService = {
   async getAll(): Promise<ChatScript[]> {
     if (isBaserowAvailable()) {
       try {
-        const response = await baserowRequest(`/api/database/rows/table/${BASEROW_CONFIG.tables.scripts}/?order_by=-created_on`);
+        // FIX 1: Removido '?order_by=-created_on' para evitar Bad Request
+        const response = await baserowRequest(`/api/database/rows/table/${BASEROW_CONFIG.tables.scripts}/`);
         return response.results.map(mapBaserowScript);
       } catch (error) {
         console.error('Erro ao buscar scripts no Baserow, usando localStorage:', error);
@@ -282,7 +287,8 @@ export const scriptService = {
   async getByClient(clientId: string): Promise<ChatScript[]> {
     if (isBaserowAvailable()) {
       try {
-        const response = await baserowRequest(`/api/database/rows/table/${BASEROW_CONFIG.tables.scripts}/?filter__client_id=${clientId}&order_by=-created_on`);
+        // FIX 1: Removido '?order_by=-created_on' para evitar Bad Request
+        const response = await baserowRequest(`/api/database/rows/table/${BASEROW_CONFIG.tables.scripts}/?filter__field_830604__equal=${clientId}`);
         return response.results.map(mapBaserowScript);
       } catch (error) {
         console.error('Erro ao buscar scripts do cliente no Baserow:', error);
