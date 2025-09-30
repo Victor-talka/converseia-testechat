@@ -82,36 +82,56 @@ const ScriptInput = () => {
 
       // Se for novo cliente, criar primeiro
       if (isNewClient) {
-        finalClientId = await clientService.create({
-          name: clientName,
-          email: clientEmail || undefined,
-          company: clientCompany || undefined,
-        });
-        finalClientName = clientName;
-        
-        // Recarregar lista de clientes
-        await loadClients();
+        try {
+          finalClientId = await clientService.create({
+            name: clientName,
+            email: clientEmail || undefined,
+            company: clientCompany || undefined,
+          });
+          finalClientName = clientName;
+          // Recarregar lista de clientes
+          await loadClients();
+        } catch (error) {
+          toast({
+            title: "Erro ao criar cliente",
+            description: "Não foi possível cadastrar o cliente no Baserow. Verifique sua conexão ou tente novamente.",
+            variant: "destructive",
+          });
+          return;
+        }
       } else {
         const selectedClient = clients.find(c => c.id === selectedClientId);
         finalClientName = selectedClient?.name || "Cliente";
       }
 
       // Criar script no banco
-      const scriptId = await scriptService.create({
-        clientId: finalClientId,
-        clientName: finalClientName,
-        script: script,
-        title: `Script - ${finalClientName}`,
-      });
+      let scriptId: string | null = null;
+      try {
+        scriptId = await scriptService.create({
+          clientId: finalClientId,
+          clientName: finalClientName,
+          script: script,
+          title: `Script - ${finalClientName}`,
+        });
+      } catch (error) {
+        toast({
+          title: "Erro ao criar script",
+          description: "Não foi possível cadastrar o script no Baserow. Verifique sua conexão ou tente novamente.",
+          variant: "destructive",
+        });
+        return;
+      }
 
       // Generate link
-      const link = `${window.location.origin}/preview/${scriptId}`;
-      setGeneratedLink(link);
+      if (scriptId) {
+        const link = `${window.location.origin}/preview/${scriptId}`;
+        setGeneratedLink(link);
 
-      toast({
-        title: "Preview criado!",
-        description: `Script do cliente ${finalClientName} salvo com sucesso`,
-      });
+        toast({
+          title: "Preview criado!",
+          description: `Script do cliente ${finalClientName} salvo com sucesso`,
+        });
+      }
 
       // Limpar campos se for novo cliente
       if (isNewClient) {
