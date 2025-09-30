@@ -1,16 +1,4 @@
-import { 
-  collection, 
-  addDoc, 
-  getDocs, 
-  doc, 
-  updateDoc, 
-  deleteDoc, 
-  query, 
-  orderBy,
-  where,
-  Timestamp 
-} from 'firebase/firestore';
-import { db, isFirebaseAvailable } from '../lib/firebase';
+import { baserowRequest, isBaserowAvailable, BASEROW_CONFIG } from '../lib/baserow';
 import { Client, ChatScript, CreateClientData, CreateScriptData } from '../types/database';
 
 // Chaves para localStorage
@@ -24,7 +12,11 @@ const localStorage_utils = {
   getClients(): Client[] {
     try {
       const data = localStorage.getItem(STORAGE_KEYS.clients);
-      return data ? JSON.parse(data) : [];
+      return data ? JSON.parse(data).map((client: any) => ({
+        ...client,
+        createdAt: new Date(client.createdAt),
+        updatedAt: new Date(client.updatedAt)
+      })) : [];
     } catch {
       return [];
     }
@@ -56,21 +48,44 @@ const localStorage_utils = {
   }
 };
 
+// Mapeamento de campos Baserow para nossa aplicação
+const mapBaserowClient = (row: any): Client => ({
+  id: row.id.toString(),
+  name: row.name || '',
+  email: row.email || '',
+  company: row.company || '',
+  createdAt: new Date(row.created_on || Date.now()),
+  updatedAt: new Date(row.updated_on || Date.now())
+});
+
+const mapBaserowScript = (row: any): ChatScript => ({
+  id: row.id.toString(),
+  clientId: row.client_id?.toString() || '',
+  clientName: row.client_name || '',
+  script: row.script || '',
+  title: row.title || '',
+  isActive: row.is_active !== false,
+  createdAt: new Date(row.created_on || Date.now()),
+  updatedAt: new Date(row.updated_on || Date.now())
+});
+
 // Serviços para Clientes
 export const clientService = {
   // Criar novo cliente
   async create(data: CreateClientData): Promise<string> {
-    if (isFirebaseAvailable()) {
+    if (isBaserowAvailable()) {
       try {
-        const docRef = await addDoc(collection(db!, 'clients'), {
-          ...data,
-          createdAt: Timestamp.now(),
-          updatedAt: Timestamp.now()
+        const response = await baserowRequest(`/database/rows/table/${BASEROW_CONFIG.tables.clients}/`, {
+          method: 'POST',
+          body: JSON.stringify({
+            name: data.name,
+            email: data.email || '',
+            company: data.company || ''
+          })
         });
-        return docRef.id;
+        return response.id.toString();
       } catch (error) {
-        console.error('Erro ao criar cliente no Firebase, usando localStorage:', error);
-        // Fallback para localStorage
+        console.error('Erro ao criar cliente no Baserow, usando localStorage:', error);
         return this.createLocal(data);
       }
     } else {
@@ -93,18 +108,12 @@ export const clientService = {
 
   // Listar todos os clientes
   async getAll(): Promise<Client[]> {
-    if (isFirebaseAvailable()) {
+    if (isBaserowAvailable()) {
       try {
-        const q = query(collection(db!, 'clients'), orderBy('createdAt', 'desc'));
-        const querySnapshot = await getDocs(q);
-        return querySnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-          createdAt: doc.data().createdAt.toDate(),
-          updatedAt: doc.data().updatedAt.toDate()
-        })) as Client[];
+        const response = await baserowRequest(`/database/rows/table/${BASEROW_CONFIG.tables.clients}/?order_by=-created_on`);
+        return response.results.map(mapBaserowClient);
       } catch (error) {
-        console.error('Erro ao buscar clientes no Firebase, usando localStorage:', error);
+        console.error('Erro ao buscar clientes no Baserow, usando localStorage:', error);
         return this.getAllLocal();
       }
     } else {
@@ -120,16 +129,19 @@ export const clientService = {
 
   // Atualizar cliente
   async update(id: string, data: Partial<CreateClientData>): Promise<void> {
-    if (isFirebaseAvailable()) {
+    if (isBaserowAvailable()) {
       try {
-        const clientRef = doc(db!, 'clients', id);
-        await updateDoc(clientRef, {
-          ...data,
-          updatedAt: Timestamp.now()
+        await baserowRequest(`/database/rows/table/${BASEROW_CONFIG.tables.clients}/${id}/`, {
+          method: 'PATCH',
+          body: JSON.stringify({
+            name: data.name,
+            email: data.email || '',
+            company: data.company || ''
+          })
         });
         return;
       } catch (error) {
-        console.error('Erro ao atualizar cliente no Firebase, usando localStorage:', error);
+        console.error('Erro ao atualizar cliente no Baserow, usando localStorage:', error);
       }
     }
     
@@ -144,12 +156,14 @@ export const clientService = {
 
   // Deletar cliente
   async delete(id: string): Promise<void> {
-    if (isFirebaseAvailable()) {
+    if (isBaserowAvailable()) {
       try {
-        await deleteDoc(doc(db!, 'clients', id));
+        await baserowRequest(`/database/rows/table/${BASEROW_CONFIG.tables.clients}/${id}/`, {
+          method: 'DELETE'
+        });
         return;
       } catch (error) {
-        console.error('Erro ao deletar cliente no Firebase, usando localStorage:', error);
+        console.error('Erro ao deletar cliente no Baserow, usando localStorage:', error);
       }
     }
     
@@ -164,17 +178,21 @@ export const clientService = {
 export const scriptService = {
   // Criar novo script
   async create(data: CreateScriptData): Promise<string> {
-    if (isFirebaseAvailable()) {
+    if (isBaserowAvailable()) {
       try {
-        const docRef = await addDoc(collection(db!, 'chatScripts'), {
-          ...data,
-          isActive: true,
-          createdAt: Timestamp.now(),
-          updatedAt: Timestamp.now()
+        const response = await baserowRequest(`/database/rows/table/${BASEROW_CONFIG.tables.scripts}/`, {
+          method: 'POST',
+          body: JSON.stringify({
+            client_id: parseInt(data.clientId),
+            client_name: data.clientName,
+            script: data.script,
+            title: data.title || `Script - ${data.clientName}`,
+            is_active: true
+          })
         });
-        return docRef.id;
+        return response.id.toString();
       } catch (error) {
-        console.error('Erro ao criar script no Firebase, usando localStorage:', error);
+        console.error('Erro ao criar script no Baserow, usando localStorage:', error);
         return this.createLocal(data);
       }
     } else {
@@ -198,18 +216,12 @@ export const scriptService = {
 
   // Listar todos os scripts
   async getAll(): Promise<ChatScript[]> {
-    if (isFirebaseAvailable()) {
+    if (isBaserowAvailable()) {
       try {
-        const q = query(collection(db!, 'chatScripts'), orderBy('createdAt', 'desc'));
-        const querySnapshot = await getDocs(q);
-        return querySnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-          createdAt: doc.data().createdAt.toDate(),
-          updatedAt: doc.data().updatedAt.toDate()
-        })) as ChatScript[];
+        const response = await baserowRequest(`/database/rows/table/${BASEROW_CONFIG.tables.scripts}/?order_by=-created_on`);
+        return response.results.map(mapBaserowScript);
       } catch (error) {
-        console.error('Erro ao buscar scripts no Firebase, usando localStorage:', error);
+        console.error('Erro ao buscar scripts no Baserow, usando localStorage:', error);
         return this.getAllLocal();
       }
     } else {
@@ -225,12 +237,12 @@ export const scriptService = {
 
   // Buscar script por ID
   async getById(id: string): Promise<ChatScript | null> {
-    if (isFirebaseAvailable()) {
+    if (isBaserowAvailable()) {
       try {
-        const scripts = await this.getAll();
-        return scripts.find(script => script.id === id) || null;
+        const response = await baserowRequest(`/database/rows/table/${BASEROW_CONFIG.tables.scripts}/${id}/`);
+        return mapBaserowScript(response);
       } catch (error) {
-        console.error('Erro ao buscar script no Firebase, usando localStorage:', error);
+        console.error('Erro ao buscar script no Baserow, usando localStorage:', error);
       }
     }
     
@@ -268,22 +280,35 @@ export const scriptService = {
 
   // Buscar scripts por cliente
   async getByClient(clientId: string): Promise<ChatScript[]> {
-    const allScripts = await this.getAll();
+    if (isBaserowAvailable()) {
+      try {
+        const response = await baserowRequest(`/database/rows/table/${BASEROW_CONFIG.tables.scripts}/?filter__client_id=${clientId}&order_by=-created_on`);
+        return response.results.map(mapBaserowScript);
+      } catch (error) {
+        console.error('Erro ao buscar scripts do cliente no Baserow:', error);
+      }
+    }
+    
+    const allScripts = await this.getAllLocal();
     return allScripts.filter(script => script.clientId === clientId);
   },
 
   // Atualizar script
   async update(id: string, data: Partial<CreateScriptData>): Promise<void> {
-    if (isFirebaseAvailable()) {
+    if (isBaserowAvailable()) {
       try {
-        const scriptRef = doc(db!, 'chatScripts', id);
-        await updateDoc(scriptRef, {
-          ...data,
-          updatedAt: Timestamp.now()
+        const updateData: any = {};
+        if (data.script) updateData.script = data.script;
+        if (data.title) updateData.title = data.title;
+        if (data.clientName) updateData.client_name = data.clientName;
+        
+        await baserowRequest(`/database/rows/table/${BASEROW_CONFIG.tables.scripts}/${id}/`, {
+          method: 'PATCH',
+          body: JSON.stringify(updateData)
         });
         return;
       } catch (error) {
-        console.error('Erro ao atualizar script no Firebase, usando localStorage:', error);
+        console.error('Erro ao atualizar script no Baserow, usando localStorage:', error);
       }
     }
     
@@ -298,12 +323,14 @@ export const scriptService = {
 
   // Deletar script
   async delete(id: string): Promise<void> {
-    if (isFirebaseAvailable()) {
+    if (isBaserowAvailable()) {
       try {
-        await deleteDoc(doc(db!, 'chatScripts', id));
+        await baserowRequest(`/database/rows/table/${BASEROW_CONFIG.tables.scripts}/${id}/`, {
+          method: 'DELETE'
+        });
         return;
       } catch (error) {
-        console.error('Erro ao deletar script no Firebase, usando localStorage:', error);
+        console.error('Erro ao deletar script no Baserow, usando localStorage:', error);
       }
     }
     
@@ -317,10 +344,10 @@ export const scriptService = {
 // Função para verificar o status do storage
 export const getStorageStatus = () => {
   return {
-    isFirebaseConnected: isFirebaseAvailable(),
-    storageType: isFirebaseAvailable() ? 'Firebase Firestore' : 'LocalStorage',
-    message: isFirebaseAvailable() 
-      ? 'Conectado ao Firebase - dados persistentes na nuvem' 
+    isBaserowConnected: isBaserowAvailable(),
+    storageType: isBaserowAvailable() ? 'Baserow Database' : 'LocalStorage',
+    message: isBaserowAvailable() 
+      ? 'Conectado ao Baserow - dados persistentes na nuvem' 
       : 'Usando localStorage - dados salvos localmente no navegador'
   };
 };

@@ -102,7 +102,7 @@ const ClientsManager = () => {
                   {clients.length} cliente(s) • {scripts.length} script(s)
                 </p>
                 <div className="inline-flex items-center gap-2 px-2 py-1 rounded-full bg-secondary/50 text-xs text-muted-foreground">
-                  {storageStatus.isFirebaseConnected ? (
+                  {storageStatus.isBaserowConnected ? (
                     <Database className="w-3 h-3 text-green-600" />
                   ) : (
                     <HardDrive className="w-3 h-3 text-blue-600" />

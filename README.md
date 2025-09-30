@@ -25,11 +25,11 @@ Este projeto está configurado para deploy automático no Vercel. O arquivo `ver
 - **Debug avançado**: Console detalhado para identificar problemas
 
 ### 🔒 **Sistema de Armazenamento Híbrido**
-- **Firebase Firestore**: Banco gratuito e escalável (opcional)
-- **LocalStorage**: Fallback automático quando Firebase não configurado
+- **Baserow Database**: API REST simples e gratuita (opcional)
+- **LocalStorage**: Fallback automático quando Baserow não configurado
 - **Compatibilidade**: Funciona com scripts legacy existentes
 - **Indicadores visuais**: Mostra qual storage está sendo usado
-- **Migração suave**: Dados migram automaticamente quando Firebase é configurado
+- **API Token incluído**: Token já configurado para uso imediato
 
 ## 🛠️ Configuração
 
@@ -40,21 +40,25 @@ A aplicação funciona **imediatamente** sem nenhuma configuração:
 - ✅ Dados salvos localmente no navegador
 - ✅ Deploy direto no Vercel funciona
 
-### 🚀 **Firebase (Opcional - para persistência na nuvem)**
-1. Acesse [Firebase Console](https://console.firebase.google.com/)
-2. Crie um novo projeto
-3. Ative o **Firestore Database**
-4. Configure as regras de segurança (modo desenvolvimento):
-```javascript
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if true;
-    }
-  }
-}
-```
+### 🚀 **Baserow (Opcional - para persistência na nuvem)**
+1. Acesse [Baserow.io](https://baserow.io) e crie uma conta
+2. Crie um novo banco de dados
+3. Crie duas tabelas com os campos especificados:
+
+**Tabela "Clientes":**
+- `name` (Text) - Nome do cliente
+- `email` (Text) - Email do cliente  
+- `company` (Text) - Empresa do cliente
+
+**Tabela "Scripts":**
+- `client_id` (Number) - ID do cliente
+- `client_name` (Text) - Nome do cliente
+- `script` (Long Text) - Script do chatbot
+- `title` (Text) - Título do script
+- `is_active` (Boolean) - Se o script está ativo
+
+4. Obtenha o API Token em Account Settings > API Tokens
+5. Obtenha os IDs do banco e tabelas nas URLs do Baserow
 
 ### 2. **Variáveis de Ambiente (opcional)**
 Para ativar o Firebase, crie um arquivo `.env`:
