@@ -1,6 +1,6 @@
 # Widget Converser
 
-Uma aplicação para testar e visualizar widgets de chatbot em um ambiente isolado.
+Uma aplicação completa para gerenciar clientes e testar widgets de chatbot em um ambiente isolado com banco de dados integrado.
 
 ## 🚀 Deploy no Vercel
 
@@ -12,10 +12,57 @@ Este projeto está configurado para deploy automático no Vercel. O arquivo `ver
 
 ## 🔧 Funcionalidades
 
-- **Preview Isolado**: Teste widgets de chatbot em um ambiente limpo
-- **Compartilhamento**: Gere links únicos para compartilhar previews
-- **Debug Avançado**: Console detalhado para identificar problemas
-- **Responsivo**: Funciona em desktop e mobile
+### 📊 **Gerenciamento de Clientes**
+- **Cadastro de clientes**: Nome, email, empresa
+- **Lista de clientes**: Visualização organizada com filtros
+- **Histórico de scripts**: Todos os scripts por cliente
+- **Exclusão segura**: Remove cliente e scripts associados
+
+### 💬 **Preview de Chatbots**
+- **Preview isolado**: Teste widgets em ambiente limpo
+- **Popup em destaque**: Chat abre automaticamente em destaque
+- **Compartilhamento**: Links únicos para demonstrações
+- **Debug avançado**: Console detalhado para identificar problemas
+
+### 🔒 **Banco de Dados**
+- **Firebase Firestore**: Banco gratuito e escalável
+- **Persistência**: Dados salvos permanentemente
+- **Backup automático**: Sincronização em tempo real
+- **Segurança**: Configurações de acesso controladas
+
+## 🛠️ Configuração
+
+### 1. **Firebase Setup**
+1. Acesse [Firebase Console](https://console.firebase.google.com/)
+2. Crie um novo projeto
+3. Ative o **Firestore Database**
+4. Configure as regras de segurança (modo desenvolvimento):
+```javascript
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}
+```
+
+### 2. **Variáveis de Ambiente**
+Crie um arquivo `.env` baseado no `.env.example`:
+```bash
+VITE_FIREBASE_API_KEY=your-api-key-here
+VITE_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=your-project-id
+VITE_FIREBASE_STORAGE_BUCKET=your-project.appspot.com
+VITE_FIREBASE_MESSAGING_SENDER_ID=123456789
+VITE_FIREBASE_APP_ID=1:123456789:web:abcdef123456
+```
+
+### 3. **Deploy no Vercel**
+1. Conecte seu repositório ao Vercel
+2. Adicione as variáveis de ambiente no painel do Vercel
+3. Deploy automático será feito a cada push
 
 ## 🛠️ Resolução de Problemas
 
@@ -44,11 +91,12 @@ Se o widget não carregar e você ver um erro 400 no console:
 3. **Teste em modo anônimo** para descartar extensões
 4. **Verifique se o script está completo** e sem caracteres especiais
 
-### Performance
+### Problemas com Firebase
 
-- O app usa localStorage para armazenar scripts temporariamente
-- Links de preview podem expirar se o localStorage for limpo
-- Use o painel de debug para verificar informações do ambiente
+1. **Verifique as variáveis de ambiente** no Vercel
+2. **Confirme as regras do Firestore** (devem permitir leitura/escrita)
+3. **Verifique o console do Firebase** para logs de erro
+4. **Teste a conexão** usando as ferramentas de debug do navegador
 
 ## 🔍 Debug
 
@@ -58,21 +106,35 @@ A página de preview inclui:
 - **Informações do ambiente** (domínio, protocolo, user agent)
 - **Monitoramento de requisições** (fetch e XHR)
 - **Detecção automática** de elementos do chatbot
+- **Popup em destaque** mostrando status do chat
 
 ## 📋 Como usar
 
-1. **Cole o script** do seu chatbot na página inicial
-2. **Clique em "Gerar Preview"** para criar um link único
-3. **Abra o preview** para testar o widget
-4. **Compartilhe o link** se necessário
+### **Fluxo Principal:**
+1. **Acesse a página inicial**
+2. **Escolha**: Novo cliente ou cliente existente
+3. **Preencha os dados** do cliente (se novo)
+4. **Cole o script** do chatbot
+5. **Clique em "Gerar Preview"**
+6. **Teste o widget** que abrirá em popup
+7. **Compartilhe o link** se necessário
+
+### **Gerenciamento:**
+1. **Clique em "Gerenciar Clientes"**
+2. **Visualize todos** os clientes e scripts
+3. **Acesse previews** de scripts existentes
+4. **Delete clientes** e scripts conforme necessário
 
 ## 🏗️ Tecnologias
 
-- React + TypeScript
-- Vite (build tool)
-- Tailwind CSS (estilização)
-- React Router (navegação)
-- Shadcn/ui (componentes)
+- **Frontend**: React + TypeScript
+- **Build**: Vite
+- **Estilização**: Tailwind CSS
+- **Componentes**: Shadcn/ui
+- **Roteamento**: React Router
+- **Banco de Dados**: Firebase Firestore
+- **Deploy**: Vercel
+- **Ícones**: Lucide React
 
 ## 📦 Scripts
 
@@ -101,6 +163,35 @@ Se precisar fazer deploy manual:
 1. Instale a CLI do Vercel: `npm i -g vercel`
 2. Execute: `vercel`
 3. Siga as instruções interativas
+4. Configure as variáveis de ambiente
+
+## 📊 Estrutura de Dados
+
+### **Cliente**
+```typescript
+{
+  id: string;
+  name: string;
+  email?: string;
+  company?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+```
+
+### **Script de Chat**
+```typescript
+{
+  id: string;
+  clientId: string;
+  clientName: string;
+  script: string;
+  title?: string;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+```
 
 ## 📄 Licença
 

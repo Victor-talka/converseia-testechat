@@ -1,17 +1,46 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { Copy, Sparkles, Code2 } from "lucide-react";
+import { Copy, Sparkles, Code2, User, Plus, Users } from "lucide-react";
+import { clientService, scriptService } from "@/services/database";
+import { Client } from "@/types/database";
 
 const ScriptInput = () => {
   const [script, setScript] = useState("");
+  const [clientName, setClientName] = useState("");
+  const [clientEmail, setClientEmail] = useState("");
+  const [clientCompany, setClientCompany] = useState("");
   const [generatedLink, setGeneratedLink] = useState("");
+  const [clients, setClients] = useState<Client[]>([]);
+  const [selectedClientId, setSelectedClientId] = useState("");
+  const [isNewClient, setIsNewClient] = useState(true);
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const generatePreview = () => {
+  // Carregar clientes ao montar o componente
+  useEffect(() => {
+    loadClients();
+  }, []);
+
+  const loadClients = async () => {
+    try {
+      const clientList = await clientService.getAll();
+      setClients(clientList);
+    } catch (error) {
+      console.error('Erro ao carregar clientes:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao carregar lista de clientes",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const generatePreview = async () => {
     if (!script.trim()) {
       toast({
         title: "Script vazio",
@@ -21,26 +50,80 @@ const ScriptInput = () => {
       return;
     }
 
-    // Generate unique ID
-    const id = Math.random().toString(36).substring(2, 15);
-    
-    // Store script in localStorage
-    const storedScripts = localStorage.getItem("chatbot-scripts");
-    const scripts = storedScripts ? JSON.parse(storedScripts) : {};
-    scripts[id] = {
-      script: script,
-      createdAt: new Date().toISOString(),
-    };
-    localStorage.setItem("chatbot-scripts", JSON.stringify(scripts));
+    if (isNewClient && !clientName.trim()) {
+      toast({
+        title: "Nome do cliente obrigatório",
+        description: "Por favor, informe o nome do cliente",
+        variant: "destructive",
+      });
+      return;
+    }
 
-    // Generate link
-    const link = `${window.location.origin}/preview/${id}`;
-    setGeneratedLink(link);
+    if (!isNewClient && !selectedClientId) {
+      toast({
+        title: "Cliente não selecionado",
+        description: "Por favor, selecione um cliente existente",
+        variant: "destructive",
+      });
+      return;
+    }
 
-    toast({
-      title: "Link gerado!",
-      description: "Seu preview está pronto para ser compartilhado",
-    });
+    setLoading(true);
+
+    try {
+      let finalClientId = selectedClientId;
+      let finalClientName = clientName;
+
+      // Se for novo cliente, criar primeiro
+      if (isNewClient) {
+        finalClientId = await clientService.create({
+          name: clientName,
+          email: clientEmail || undefined,
+          company: clientCompany || undefined,
+        });
+        finalClientName = clientName;
+        
+        // Recarregar lista de clientes
+        await loadClients();
+      } else {
+        const selectedClient = clients.find(c => c.id === selectedClientId);
+        finalClientName = selectedClient?.name || "Cliente";
+      }
+
+      // Criar script no banco
+      const scriptId = await scriptService.create({
+        clientId: finalClientId,
+        clientName: finalClientName,
+        script: script,
+        title: `Script - ${finalClientName}`,
+      });
+
+      // Generate link
+      const link = `${window.location.origin}/preview/${scriptId}`;
+      setGeneratedLink(link);
+
+      toast({
+        title: "Preview criado!",
+        description: `Script do cliente ${finalClientName} salvo com sucesso`,
+      });
+
+      // Limpar campos se for novo cliente
+      if (isNewClient) {
+        setClientName("");
+        setClientEmail("");
+        setClientCompany("");
+      }
+      
+    } catch (error) {
+      console.error('Erro ao criar preview:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao salvar no banco de dados",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const copyLink = () => {
@@ -58,6 +141,16 @@ const ScriptInput = () => {
   return (
     <div className="w-full max-w-4xl mx-auto space-y-6">
       <div className="text-center space-y-4 mb-8">
+        <div className="flex justify-end mb-4">
+          <Button
+            variant="outline"
+            onClick={() => navigate("/clients")}
+            className="flex items-center gap-2"
+          >
+            <Users className="w-4 h-4" />
+            Gerenciar Clientes
+          </Button>
+        </div>
         <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-accent shadow-[var(--shadow-glow)] mb-4">
           <Code2 className="w-8 h-8 text-primary-foreground" />
         </div>
@@ -70,6 +163,71 @@ const ScriptInput = () => {
       </div>
 
       <div className="bg-card rounded-2xl shadow-[var(--shadow-elegant)] p-8 space-y-6 border border-border/50">
+        {/* Seção Cliente */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <label className="text-sm font-semibold text-foreground flex items-center gap-2">
+              <User className="w-4 h-4 text-primary" />
+              Informações do Cliente
+            </label>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant={isNewClient ? "default" : "outline"}
+                size="sm"
+                onClick={() => setIsNewClient(true)}
+              >
+                <Plus className="w-4 h-4 mr-1" />
+                Novo Cliente
+              </Button>
+              <Button
+                type="button"
+                variant={!isNewClient ? "default" : "outline"}
+                size="sm"
+                onClick={() => setIsNewClient(false)}
+              >
+                <Users className="w-4 h-4 mr-1" />
+                Cliente Existente
+              </Button>
+            </div>
+          </div>
+
+          {isNewClient ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Input
+                placeholder="Nome do cliente *"
+                value={clientName}
+                onChange={(e) => setClientName(e.target.value)}
+                className="col-span-1 md:col-span-2"
+              />
+              <Input
+                placeholder="Email (opcional)"
+                type="email"
+                value={clientEmail}
+                onChange={(e) => setClientEmail(e.target.value)}
+              />
+              <Input
+                placeholder="Empresa (opcional)"
+                value={clientCompany}
+                onChange={(e) => setClientCompany(e.target.value)}
+              />
+            </div>
+          ) : (
+            <select
+              className="w-full p-3 border border-border rounded-lg bg-background text-foreground"
+              value={selectedClientId}
+              onChange={(e) => setSelectedClientId(e.target.value)}
+            >
+              <option value="">Selecione um cliente</option>
+              {clients.map((client) => (
+                <option key={client.id} value={client.id}>
+                  {client.name} {client.company && `- ${client.company}`}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+
         <div className="space-y-3">
           <label className="text-sm font-semibold text-foreground flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-primary" />
@@ -101,9 +259,19 @@ const ScriptInput = () => {
           size="lg"
           variant="gradient"
           className="w-full"
+          disabled={loading}
         >
-          <Sparkles className="w-5 h-5" />
-          Gerar Preview
+          {loading ? (
+            <>
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+              Salvando...
+            </>
+          ) : (
+            <>
+              <Sparkles className="w-5 h-5" />
+              Gerar Preview
+            </>
+          )}
         </Button>
       </div>
 
@@ -128,6 +296,11 @@ const ScriptInput = () => {
               onClick={() => {
                 setScript("");
                 setGeneratedLink("");
+                setClientName("");
+                setClientEmail("");
+                setClientCompany("");
+                setSelectedClientId("");
+                setIsNewClient(true);
               }}
               size="lg"
               variant="secondary"
