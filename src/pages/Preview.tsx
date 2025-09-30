@@ -37,6 +37,8 @@ const Preview = () => {
   const [slugDetectado, setSlugDetectado] = useState<string | null>(null);
   const [debugFetches, setDebugFetches] = useState<any[]>([]);
   const [forcandoAbertura, setForcandoAbertura] = useState(false);
+  const conversaAtivaRef = useRef<string | null>(null);
+  const injecaoTimestampRef = useRef<number>(0);
 
   // Carrega widgets arquivados do localStorage
   useEffect(() => {
@@ -60,21 +62,20 @@ const Preview = () => {
   // Remove todos os popups e elementos indesejados
   const removerPopupsEBranding = useCallback(() => {
     const remover = () => {
-      // Remove popups "Chat Ativo" e similares
-      document.querySelectorAll('[role="dialog"], .dialog, .modal, [class*="popup"], [class*="z-\\["]').forEach((el) => {
-        const element = el as HTMLElement;
-        const text = (element.textContent || '').toLowerCase();
-        
-        if (text.includes('chat ativo') || 
-            text.includes('widget de chat carregado') || 
-            text.includes('chat carregado') ||
-            text.includes('cliente:') ||
-            text.includes('fechar e usar chat') ||
-            text.includes('criar novo')) {
-          element.style.display = 'none';
-          element.remove();
-        }
-      });
+      // Ajuste: somente durante primeiros 5s após injeção removemos popups transitórios
+      const agora = Date.now();
+      const dentroJanelaInicial = (agora - injecaoTimestampRef.current) < 5000;
+      if (dentroJanelaInicial) {
+        document.querySelectorAll('[role="dialog"], .dialog, .modal, [class*="popup"], [class*="toast"], [class*="notify"]').forEach((el) => {
+          const element = el as HTMLElement;
+          const text = (element.textContent || '').toLowerCase();
+          // Critérios mais específicos para não remover a janela principal do chat
+          const pequeno = element.offsetHeight < 160 && element.offsetWidth < 420;
+          if (pequeno && (text.includes('chat ativo') || text.includes('carregado'))) {
+            element.remove();
+          }
+        });
+      }
 
       // Remove backdrop/overlay dos modals
       document.querySelectorAll('[class*="backdrop"], [class*="overlay"], [class*="bg-black"]').forEach((el) => {
@@ -95,12 +96,14 @@ const Preview = () => {
       });
 
       // Remove botões "Criar Novo" que não sejam da sidebar
-      document.querySelectorAll('button').forEach(btn => {
-        const text = (btn.textContent || '').toLowerCase();
-        if (text === 'criar novo' && !btn.closest('.sidebar, [data-sidebar]')) {
-          btn.style.display = 'none';
-        }
-      });
+      if (dentroJanelaInicial) {
+        document.querySelectorAll('button').forEach(btn => {
+          const text = (btn.textContent || '').toLowerCase();
+          if (text === 'criar novo' && !btn.closest('.sidebar, [data-sidebar]')) {
+            btn.style.display = 'none';
+          }
+        });
+      }
     };
 
     remover();
@@ -124,22 +127,51 @@ const Preview = () => {
   const arquivarWidgetAtual = useCallback(() => {
     const idAtual = localStorage.getItem(CONVERSATION_STORAGE_KEY);
     if (!idAtual) return;
+    conversaAtivaRef.current = idAtual;
     if (widgetsArquivados.some(w => w.id === idAtual)) return;
-
     const novo: WidgetArquivado = {
       id: idAtual,
-      titulo: `Widget ${widgetsArquivados.length + 1}`,
+      titulo: `Conversa ${widgetsArquivados.length + 1}`,
       criadoEm: Date.now(),
-      ultimaAtualizacao: Date.now()
+      ultimaAtualizacao: Date.now(),
+      isActive: true
     };
     const lista = [novo, ...widgetsArquivados.map(w => ({ ...w, isActive: false }))];
     persistirWidgets(lista);
   }, [widgetsArquivados]);
 
+  // Captura mudança do ID de conversa via hook em localStorage.setItem
+  useEffect(() => {
+    if ((window as any).__conversationHooked) return;
+    const originalSetItem = localStorage.setItem.bind(localStorage);
+  (localStorage as any).setItem = (key: string, value: string) => {
+      originalSetItem(key, value);
+      if (key === CONVERSATION_STORAGE_KEY) {
+        // Novo ID detectado
+        conversaAtivaRef.current = value;
+        setWidgetsArquivados(prev => {
+          if (prev.some(w => w.id === value)) {
+            return prev.map(w => ({ ...w, isActive: w.id === value, ultimaAtualizacao: Date.now() }));
+          }
+          const novo: WidgetArquivado = {
+            id: value,
+            titulo: `Conversa ${prev.length + 1}`,
+            criadoEm: Date.now(),
+            ultimaAtualizacao: Date.now(),
+            isActive: true
+          };
+            return [novo, ...prev.map(w => ({ ...w, isActive: false }))];
+        });
+      }
+  };
+    (window as any).__conversationHooked = true;
+  }, []);
+
   // Injeta o script do widget sem mostrar popup
   const injetarWidget = useCallback(async () => {
     if (reinjetandoRef.current) return;
     reinjetandoRef.current = true;
+    injecaoTimestampRef.current = Date.now();
 
     try {
       // Remove widgets anteriores
@@ -201,16 +233,29 @@ const Preview = () => {
         scriptElement.text = scriptContent;
       }
 
+      const posicionarWidget = () => {
+        const host: any = document.querySelector('ra-chatbot-widget');
+        if (host) {
+          host.style.position = 'fixed';
+            host.style.bottom = '24px';
+            host.style.right = '24px';
+            host.style.zIndex = '9999';
+        }
+      };
+
       const finalizarInjecao = () => {
         setTimeout(() => {
           removerPopupsEBranding();
+          posicionarWidget();
           reinjetandoRef.current = false;
           setIsLoading(false);
           const widget = document.getElementById('ra_wc_chatbot') ||
             document.querySelector('[id*="chatbot"]') ||
             document.querySelector('[class*="chatbot"]');
-          if (widget) console.log('Widget encontrado:', widget);
-          else console.warn('Widget não encontrado após injeção');
+          if (widget) {
+            console.log('Widget encontrado:', widget);
+            posicionarWidget();
+          } else console.warn('Widget não encontrado após injeção');
         }, 1500);
       };
 
@@ -310,11 +355,7 @@ const Preview = () => {
     setIsLoading(true);
     injetarWidget();
     setSidebarOpen(false);
-    
-    toast({
-      title: "Novo widget criado",
-      description: "Um novo widget de chat foi inicializado."
-    });
+    // Removido toast verde para evitar "pop" visual
   };
 
   // Seleciona widget arquivado
@@ -326,21 +367,14 @@ const Preview = () => {
     persistirWidgets(lista);
     setSidebarOpen(false);
     
-    toast({
-      title: "Widget selecionado",
-      description: "Widget anterior reativado."
-    });
+    // Não mostrar toast para UX mais limpa
   };
 
   // Deleta widget
   const deletarWidget = (widgetId: string) => {
     const lista = widgetsArquivados.filter(w => w.id !== widgetId);
     persistirWidgets(lista);
-    
-    toast({
-      title: "Widget removido",
-      description: "Widget deletado do histórico."
-    });
+    if (conversaAtivaRef.current === widgetId) conversaAtivaRef.current = null;
   };
 
   // Formata timestamp
