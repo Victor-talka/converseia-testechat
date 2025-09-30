@@ -53,20 +53,20 @@ const localStorage_utils = {
 // Mapeamento de campos Baserow para nossa aplicação
 const mapBaserowClient = (row: any): Client => ({
   id: row.id.toString(),
-  name: row.name || '',
-  email: row.email || '',
-  company: row.company || '',
+  name: row.field_5700970 || '',
+  email: row.field_5701032 || '',
+  company: row.field_5701033 || '',
   createdAt: new Date(row.created_on || Date.now()),
   updatedAt: new Date(row.updated_on || Date.now())
 });
 
 const mapBaserowScript = (row: any): ChatScript => ({
   id: row.id.toString(),
-  clientId: row.client_id?.toString() || '',
-  clientName: row.client_name || '',
-  script: row.script || '',
-  title: row.title || '',
-  isActive: row.is_active !== false,
+  clientId: row.field_5701034?.toString() || '',
+  clientName: row.field_5701038 || '',
+  script: row.field_5701039 || '',
+  title: row.field_5701040 || '',
+  isActive: row.field_5701041 !== false,
   createdAt: new Date(row.created_on || Date.now()),
   updatedAt: new Date(row.updated_on || Date.now())
 });
@@ -79,9 +79,9 @@ export const clientService = {
       const response = await baserowRequest(`/api/database/rows/table/${BASEROW_CONFIG.tables.clients}/`, {
         method: 'POST',
         body: JSON.stringify({
-          name: data.name,
-          email: data.email || '',
-          company: data.company || ''
+          field_5700970: data.name,     // name
+          field_5701032: data.email || '',  // email 
+          field_5701033: data.company || '' // company
         })
       });
       return response.id.toString();
@@ -131,9 +131,9 @@ export const clientService = {
       await baserowRequest(`/api/database/rows/table/${BASEROW_CONFIG.tables.clients}/${id}/`, {
         method: 'PATCH',
         body: JSON.stringify({
-          name: data.name,
-          email: data.email || '',
-          company: data.company || ''
+          field_5700970: data.name,
+          field_5701032: data.email || '',
+          field_5701033: data.company || ''
         })
       });
       return;
@@ -169,15 +169,20 @@ export const scriptService = {
   // Criar novo script
   async create(data: CreateScriptData): Promise<string> {
     if (isBaserowAvailable()) {
+      // Garantir que client_id seja numérico
+      const clientIdNumber = parseInt(data.clientId);
+      if (isNaN(clientIdNumber)) {
+        throw new Error(`ID do cliente inválido: ${data.clientId}. Deve ser numérico para sincronizar com Baserow.`);
+      }
+      
       const response = await baserowRequest(`/api/database/rows/table/${BASEROW_CONFIG.tables.scripts}/`, {
         method: 'POST',
         body: JSON.stringify({
-          // parseInt é seguro agora por causa do FIX 2
-          client_id: parseInt(data.clientId),
-          client_name: data.clientName,
-          script: data.script,
-          title: data.title || `Script - ${data.clientName}`,
-          is_active: true
+          field_5701034: clientIdNumber,  // client_id
+          field_5701038: data.clientName, // client_name
+          field_5701039: data.script,     // script
+          field_5701040: data.title || `Script - ${data.clientName}`, // title
+          field_5701041: true             // is_active
         })
       });
       return response.id.toString();
@@ -269,9 +274,12 @@ export const scriptService = {
   async getByClient(clientId: string): Promise<ChatScript[]> {
     if (isBaserowAvailable()) {
       try {
-        // FIX 1: Removido '?order_by=-created_on' para evitar Bad Request
-        const response = await baserowRequest(`/api/database/rows/table/${BASEROW_CONFIG.tables.scripts}/?filter__field_830604__equal=${clientId}`);
-        return response.results.map(mapBaserowScript);
+        // Usar filtro direto no Baserow com o client_id
+        const clientIdNumber = parseInt(clientId);
+        if (!isNaN(clientIdNumber)) {
+          const response = await baserowRequest(`/api/database/rows/table/${BASEROW_CONFIG.tables.scripts}/?filter__field_5701034__equal=${clientIdNumber}`);
+          return response.results.map(mapBaserowScript);
+        }
       } catch (error) {
         console.error('Erro ao buscar scripts do cliente no Baserow:', error);
       }
@@ -285,9 +293,9 @@ export const scriptService = {
   async update(id: string, data: Partial<CreateScriptData>): Promise<void> {
     if (isBaserowAvailable()) {
       const updateData: any = {};
-      if (data.script) updateData.script = data.script;
-      if (data.title) updateData.title = data.title;
-      if (data.clientName) updateData.client_name = data.clientName;
+      if (data.script) updateData.field_5701039 = data.script;
+      if (data.title) updateData.field_5701040 = data.title;
+      if (data.clientName) updateData.field_5701038 = data.clientName;
       
       await baserowRequest(`/api/database/rows/table/${BASEROW_CONFIG.tables.scripts}/${id}/`, {
         method: 'PATCH',

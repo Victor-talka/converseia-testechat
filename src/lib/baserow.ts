@@ -26,6 +26,11 @@ export const baserowRequest = async (endpoint: string, options: RequestInit = {}
     'Content-Type': 'application/json',
   };
 
+  console.log(`Baserow Request: ${options.method || 'GET'} ${url}`);
+  if (options.body) {
+    console.log('Request Body:', options.body);
+  }
+
   const response = await fetch(url, {
     ...options,
     headers: {
@@ -35,10 +40,14 @@ export const baserowRequest = async (endpoint: string, options: RequestInit = {}
   });
 
   if (!response.ok) {
-    throw new Error(`Baserow API Error: ${response.status} ${response.statusText}`);
+    const errorText = await response.text();
+    console.error(`Baserow API Error: ${response.status} ${response.statusText}`, errorText);
+    throw new Error(`Baserow API Error: ${response.status} ${response.statusText} - ${errorText}`);
   }
 
-  return response.json();
+  const result = await response.json();
+  console.log('Baserow Response:', result);
+  return result;
 };
 
 // Função para verificar se Baserow está disponível

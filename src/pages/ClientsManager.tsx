@@ -17,7 +17,9 @@ const ClientsManager = () => {
   const [loading, setLoading] = useState(true);
   const [storageStatus, setStorageStatus] = useState(getStorageStatus());
   const [editingScript, setEditingScript] = useState<ChatScript | null>(null);
-  const [editForm, setEditForm] = useState({ title: '', script: '' });
+  const [editingClient, setEditingClient] = useState<Client | null>(null);
+  const [scriptForm, setScriptForm] = useState({ title: '', script: '' });
+  const [clientForm, setClientForm] = useState({ name: '', email: '', company: '' });
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -82,7 +84,12 @@ const ClientsManager = () => {
 
   const handleEditScript = (script: ChatScript) => {
     setEditingScript(script);
-    setEditForm({ title: script.title, script: script.script });
+    setScriptForm({ title: script.title, script: script.script });
+  };
+
+  const handleEditClient = (client: Client) => {
+    setEditingClient(client);
+    setClientForm({ name: client.name, email: client.email || '', company: client.company || '' });
   };
 
   const handleSaveScript = async () => {
@@ -90,8 +97,8 @@ const ClientsManager = () => {
     
     try {
       await scriptService.update(editingScript.id, {
-        title: editForm.title,
-        script: editForm.script
+        title: scriptForm.title,
+        script: scriptForm.script
       });
       
       toast({
@@ -106,6 +113,33 @@ const ClientsManager = () => {
       toast({
         title: "Erro",
         description: "Erro ao atualizar script",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleSaveClient = async () => {
+    if (!editingClient) return;
+    
+    try {
+      await clientService.update(editingClient.id, {
+        name: clientForm.name,
+        email: clientForm.email,
+        company: clientForm.company
+      });
+      
+      toast({
+        title: "Cliente atualizado",
+        description: "Os dados do cliente foram salvos com sucesso",
+      });
+      
+      setEditingClient(null);
+      await loadData();
+    } catch (error) {
+      console.error('Erro ao atualizar cliente:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao atualizar cliente",
         variant: "destructive",
       });
     }
@@ -194,7 +228,7 @@ const ClientsManager = () => {
                 <Card key={client.id}>
                   <CardHeader>
                     <div className="flex items-start justify-between">
-                      <div>
+                      <div className="flex-1">
                         <CardTitle className="flex items-center gap-2">
                           <Users className="w-5 h-5 text-primary" />
                           {client.name}
@@ -205,13 +239,70 @@ const ClientsManager = () => {
                           Criado em {client.createdAt.toLocaleDateString('pt-BR')}
                         </CardDescription>
                       </div>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => handleDeleteClient(client.id, client.name)}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                      <div className="flex gap-2">
+                        {/* Botão Editar Cliente */}
+                        <Dialog>
+                          <DialogTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleEditClient(client)}
+                            >
+                              <Edit className="w-4 h-4 mr-1" />
+                              Editar Cliente
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle>Editar Cliente</DialogTitle>
+                            </DialogHeader>
+                            <div className="space-y-4">
+                              <div>
+                                <Label htmlFor="client-name">Nome</Label>
+                                <Input
+                                  id="client-name"
+                                  value={clientForm.name}
+                                  onChange={(e) => setClientForm(prev => ({ ...prev, name: e.target.value }))}
+                                />
+                              </div>
+                              <div>
+                                <Label htmlFor="client-email">Email</Label>
+                                <Input
+                                  id="client-email"
+                                  type="email"
+                                  value={clientForm.email}
+                                  onChange={(e) => setClientForm(prev => ({ ...prev, email: e.target.value }))}
+                                />
+                              </div>
+                              <div>
+                                <Label htmlFor="client-company">Empresa</Label>
+                                <Input
+                                  id="client-company"
+                                  value={clientForm.company}
+                                  onChange={(e) => setClientForm(prev => ({ ...prev, company: e.target.value }))}
+                                />
+                              </div>
+                            </div>
+                            <div className="flex justify-end gap-2 pt-4">
+                              <Button variant="outline" onClick={() => setEditingClient(null)}>
+                                Cancelar
+                              </Button>
+                              <Button onClick={handleSaveClient}>
+                                Salvar Alterações
+                              </Button>
+                            </div>
+                          </DialogContent>
+                        </Dialog>
+                        
+                        {/* Botão Deletar Cliente */}
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => handleDeleteClient(client.id, client.name)}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent>
@@ -224,11 +315,11 @@ const ClientsManager = () => {
                           Nenhum script criado ainda
                         </p>
                       ) : (
-                        <div className="grid gap-2">
+                        <div className="grid gap-3">
                           {clientScripts.map((script) => (
                             <div
                               key={script.id}
-                              className="flex items-center justify-between p-3 bg-secondary/30 rounded-lg"
+                              className="flex items-center justify-between p-4 bg-secondary/30 rounded-lg border"
                             >
                               <div className="flex-1">
                                 <p className="font-medium text-sm">{script.title}</p>
@@ -237,19 +328,24 @@ const ClientsManager = () => {
                                 </p>
                               </div>
                               <div className="flex gap-2">
+                                {/* Botão Copiar Link */}
                                 <Button
                                   size="sm"
                                   variant="outline"
                                   onClick={() => handleCopyLink(script.id)}
+                                  title="Copiar Link"
                                 >
                                   <Copy className="w-4 h-4" />
                                 </Button>
+                                
+                                {/* Botão Editar Script */}
                                 <Dialog>
                                   <DialogTrigger asChild>
                                     <Button
                                       size="sm"
                                       variant="outline"
                                       onClick={() => handleEditScript(script)}
+                                      title="Editar Script"
                                     >
                                       <Edit className="w-4 h-4" />
                                     </Button>
@@ -263,16 +359,16 @@ const ClientsManager = () => {
                                         <Label htmlFor="title">Título</Label>
                                         <Input
                                           id="title"
-                                          value={editForm.title}
-                                          onChange={(e) => setEditForm(prev => ({ ...prev, title: e.target.value }))}
+                                          value={scriptForm.title}
+                                          onChange={(e) => setScriptForm(prev => ({ ...prev, title: e.target.value }))}
                                         />
                                       </div>
                                       <div className="flex-1 flex flex-col overflow-hidden">
                                         <Label htmlFor="script">Script</Label>
                                         <Textarea
                                           id="script"
-                                          value={editForm.script}
-                                          onChange={(e) => setEditForm(prev => ({ ...prev, script: e.target.value }))}
+                                          value={scriptForm.script}
+                                          onChange={(e) => setScriptForm(prev => ({ ...prev, script: e.target.value }))}
                                           className="flex-1 min-h-[400px] font-mono text-sm"
                                           placeholder="Digite o script aqui..."
                                         />
@@ -288,10 +384,13 @@ const ClientsManager = () => {
                                     </div>
                                   </DialogContent>
                                 </Dialog>
+                                
+                                {/* Botão Ver Preview */}
                                 <Button
                                   size="sm"
                                   variant="outline"
                                   onClick={() => window.open(`/preview/${script.id}`, '_blank')}
+                                  title="Ver Preview"
                                 >
                                   <Eye className="w-4 h-4" />
                                 </Button>
