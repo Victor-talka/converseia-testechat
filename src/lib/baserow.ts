@@ -11,6 +11,10 @@ const BASEROW_CONFIG = {
 
 // Verificar se as configurações do Baserow estão disponíveis
 const hasBaserowConfig = () => {
+  // Desabilitado temporariamente para evitar erros 400
+  // Remover este return false quando o Baserow estiver configurado corretamente
+  return false;
+  
   return BASEROW_CONFIG.apiToken && 
          BASEROW_CONFIG.apiToken !== "your-api-token-here" &&
          BASEROW_CONFIG.databaseId &&
@@ -70,7 +74,7 @@ export const testBaserowConnection = async () => {
     });
 
     // Tentar buscar as tabelas do banco
-    const response = await baserowRequest(`/api/database/tables/${BASEROW_CONFIG.databaseId}/`);
+    const response = await baserowRequest(`/api/database/${BASEROW_CONFIG.databaseId}/tables/`);
     console.log("✅ Baserow conectado com sucesso", response);
     return { success: true, message: "Conectado ao Baserow" };
   } catch (error) {
