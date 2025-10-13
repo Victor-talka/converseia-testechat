@@ -27,14 +27,14 @@ console.log('🔧 Baserow Config:', {
 
 // Verificar se as configurações do Baserow estão disponíveis
 const hasBaserowConfig = () => {
-  // Desabilitado temporariamente para evitar erros 400
-  // Remover este return false quando o Baserow estiver configurado corretamente
-  return false;
+  const hasToken = BASEROW_CONFIG.apiToken && 
+                   BASEROW_CONFIG.apiToken !== "your-api-token-here";
+  const hasDb = BASEROW_CONFIG.databaseId && 
+                BASEROW_CONFIG.databaseId !== "your-database-id";
   
-  return BASEROW_CONFIG.apiToken && 
-         BASEROW_CONFIG.apiToken !== "your-api-token-here" &&
-         BASEROW_CONFIG.databaseId &&
-         BASEROW_CONFIG.databaseId !== "your-database-id";
+  console.log('🔍 Verificando configuração Baserow:', { hasToken, hasDb });
+  
+  return hasToken && hasDb;
 };
 
 // Função para fazer requisições ao Baserow

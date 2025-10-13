@@ -312,38 +312,65 @@ const ScriptInput = () => {
       </div>
 
       {generatedLink && (
-        <div className="bg-card rounded-2xl shadow-[var(--shadow-elegant)] p-8 space-y-4 border border-border/50 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <h2 className="text-lg font-semibold text-foreground">Link Gerado</h2>
-          
-          <div className="flex gap-2">
-            <div className="flex-1 bg-secondary/50 rounded-lg px-4 py-3 font-mono text-sm text-foreground break-all border border-border/50">
-              {generatedLink}
+        <div className="bg-card rounded-2xl shadow-[var(--shadow-elegant)] p-8 space-y-6 border border-border/50 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="text-center space-y-2">
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-green-100 dark:bg-green-900/30 mb-2">
+              <svg className="w-6 h-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
             </div>
-            <Button onClick={copyLink} size="lg" variant="outline">
-              <Copy className="w-5 h-5" />
-            </Button>
+            <h2 className="text-2xl font-bold text-foreground">Link Criado com Sucesso!</h2>
+            <p className="text-muted-foreground">Seu chatbot está pronto para ser testado</p>
+          </div>
+          
+          <div className="space-y-3">
+            <label className="text-sm font-semibold text-foreground">Link do Preview</label>
+            <div className="flex gap-2">
+              <div className="flex-1 bg-secondary/50 rounded-lg px-4 py-3 font-mono text-sm text-foreground break-all border border-border/50">
+                {generatedLink}
+              </div>
+              <Button onClick={copyLink} size="lg" variant="outline" className="shrink-0">
+                <Copy className="w-5 h-5" />
+              </Button>
+            </div>
           </div>
 
-          <div className="flex gap-3">
-            <Button onClick={openPreview} size="lg" variant="default" className="flex-1">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <Button onClick={openPreview} size="lg" variant="default" className="w-full">
               Abrir Preview
             </Button>
             <Button
               onClick={() => {
                 setScript("");
                 setGeneratedLink("");
-                setClientName("");
-                setClientEmail("");
-                setClientCompany("");
-                setSelectedClientId("");
-                setIsNewClient(true);
+                if (isNewClient) {
+                  setClientName("");
+                  setClientEmail("");
+                  setClientCompany("");
+                }
               }}
               size="lg"
               variant="secondary"
-              className="flex-1"
+              className="w-full"
             >
-              Novo Script
+              <Plus className="w-5 h-5 mr-2" />
+              Gerar Novo Link
             </Button>
+          </div>
+
+          <div className="bg-blue-50 dark:bg-blue-950/50 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
+            <div className="flex items-start gap-3">
+              <div className="text-blue-600 dark:text-blue-400 mt-0.5">💡</div>
+              <div className="flex-1 text-sm text-blue-700 dark:text-blue-300">
+                <p className="font-medium mb-1">Dicas para usar o link:</p>
+                <ul className="space-y-1">
+                  <li>• Compartilhe este link com seu cliente</li>
+                  <li>• Cada link gera uma sessão única de chat</li>
+                  <li>• Clique em "Nova Conversa" no preview para reiniciar</li>
+                  <li>• O chat funciona em qualquer dispositivo</li>
+                </ul>
+              </div>
+            </div>
           </div>
         </div>
       )}

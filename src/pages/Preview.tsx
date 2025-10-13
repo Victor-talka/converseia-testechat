@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { AlertCircle, MessageCircle, Menu, Edit3, MoreHorizontal, Trash2 } from "lucide-react";
+import { AlertCircle, MessageCircle, Menu, Edit3, MoreHorizontal, Trash2, Plus, RefreshCw } from "lucide-react";
 import { scriptService } from "@/services/database";
 import { ChatScript } from "@/types/database";
 import { Button } from "@/components/ui/button";
@@ -389,6 +389,11 @@ const Preview = () => {
     setReiniciandoChat(true);
     arquivarWidgetAtual();
     
+    toast({
+      title: "🔄 Criando nova conversa",
+      description: "Gerando um novo chat para você...",
+    });
+    
     // Limpar completamente o estado do chat
     localStorage.removeItem(CONVERSATION_STORAGE_KEY);
     sessionStorage.removeItem(CONVERSATION_STORAGE_KEY);
@@ -418,6 +423,11 @@ const Preview = () => {
     setTimeout(() => {
       injetarWidget();
       setReiniciandoChat(false);
+      
+      toast({
+        title: "✅ Nova conversa criada!",
+        description: "O chat foi reiniciado com sucesso",
+      });
     }, 500);
     
     setSidebarOpen(false);
@@ -681,7 +691,29 @@ const Preview = () => {
         </div>
 
         {/* Chat Area */}
-        <div className="flex-1 flex items-center justify-center p-4">
+        <div className="flex-1 flex items-center justify-center p-4 relative">
+          {/* Botão Flutuante Nova Conversa */}
+          <div className="fixed top-4 right-4 z-50 lg:right-8">
+            <Button
+              onClick={criarNovoWidget}
+              disabled={reiniciandoChat}
+              size="lg"
+              className="shadow-lg hover:shadow-xl transition-all duration-200 bg-gradient-to-r from-primary to-accent hover:scale-105"
+            >
+              {reiniciandoChat ? (
+                <>
+                  <RefreshCw className="w-5 h-5 mr-2 animate-spin" />
+                  Criando...
+                </>
+              ) : (
+                <>
+                  <Plus className="w-5 h-5 mr-2" />
+                  Nova Conversa
+                </>
+              )}
+            </Button>
+          </div>
+
           <div className="max-w-2xl w-full space-y-6">
             {/* Welcome Message */}
             <div className="text-center space-y-4">
@@ -752,17 +784,35 @@ const Preview = () => {
             )}
 
             {/* Instructions */}
-            <div className="bg-amber-50 dark:bg-amber-950/50 rounded-lg p-4 border border-amber-200 dark:border-amber-800">
+            <div className="bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/50 dark:to-orange-950/50 rounded-lg p-6 border border-amber-200 dark:border-amber-800 shadow-sm">
               <div className="flex items-start gap-3">
-                <div className="text-amber-600 dark:text-amber-400 mt-0.5">💡</div>
+                <div className="text-2xl mt-0.5">💡</div>
                 <div className="flex-1">
-                  <h3 className="font-medium text-amber-800 dark:text-amber-200 mb-1">
-                    Como usar
+                  <h3 className="font-bold text-amber-900 dark:text-amber-100 mb-3 text-lg">
+                    Como usar este preview
                   </h3>
-                  <div className="text-sm text-amber-700 dark:text-amber-300 space-y-1">
-                    <p>• O widget aparece automaticamente no canto inferior direito</p>
-                    <p>• Use "Nova conversa" na sidebar para reiniciar o chat</p>
-                    <p>• O histórico de widgets fica salvo na sidebar</p>
+                  <div className="text-sm text-amber-800 dark:text-amber-200 space-y-2">
+                    <div className="flex items-start gap-2">
+                      <span className="font-bold">1.</span>
+                      <p>O widget do chatbot aparece automaticamente no canto inferior direito da tela</p>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <span className="font-bold">2.</span>
+                      <p>Clique no botão <strong>"Nova Conversa"</strong> (no topo) sempre que quiser reiniciar o chat completamente</p>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <span className="font-bold">3.</span>
+                      <p>Use a sidebar (menu lateral) para ver o histórico de conversas anteriores</p>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <span className="font-bold">4.</span>
+                      <p>Cada "Nova Conversa" cria uma sessão independente - perfeito para testar diferentes cenários</p>
+                    </div>
+                  </div>
+                  <div className="mt-4 pt-4 border-t border-amber-300 dark:border-amber-700">
+                    <p className="text-xs text-amber-700 dark:text-amber-300 font-medium">
+                      💡 Dica: Use Ctrl/Cmd + Shift + I para abrir o console e ver logs técnicos
+                    </p>
                   </div>
                 </div>
               </div>
