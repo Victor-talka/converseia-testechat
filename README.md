@@ -4,11 +4,15 @@ Uma aplicação completa para gerenciar clientes e testar widgets de chatbot em 
 
 ## 🚀 Deploy no Vercel
 
-Este projeto está configurado para deploy automático no Vercel. O arquivo `vercel.json` já contém as configurações necessárias para:
+Este projeto está configurado para deploy automático no Vercel. 
 
-- ✅ Rotas de SPA (Single Page Application)
-- ✅ Headers de CORS para widgets externos
-- ✅ Configurações de segurança
+### ⚠️ IMPORTANTE: Problemas após Deploy?
+
+Se a aplicação funciona localmente mas não no Vercel:
+- 📖 **Leia o guia completo:** [VERCEL_SETUP.md](./VERCEL_SETUP.md)
+- 🔧 **Chat não abre?** Veja: [CHAT_TROUBLESHOOTING.md](./CHAT_TROUBLESHOOTING.md)
+
+**Resumo:** Você precisa configurar as variáveis de ambiente no painel do Vercel!
 
 ## 🔧 Funcionalidades
 
@@ -38,9 +42,27 @@ A aplicação funciona **imediatamente** sem nenhuma configuração:
 - ✅ Usa localStorage como armazenamento padrão
 - ✅ Todos os recursos funcionam normalmente
 - ✅ Dados salvos localmente no navegador
-- ✅ Deploy direto no Vercel funciona
+- ⚠️ **IMPORTANTE:** Para funcionar no Vercel, siga [VERCEL_SETUP.md](./VERCEL_SETUP.md)
 
-### 🚀 **Baserow (Opcional - para persistência na nuvem)**
+### �️ **Baserow Database (Recomendado para Produção)**
+
+A aplicação já vem com API Token configurado! Basta adicionar as variáveis de ambiente:
+
+**Desenvolvimento Local:**
+```bash
+VITE_BASEROW_API_TOKEN=wT4NNP5hwTaVuzixirWycVT4D4xDRorE
+VITE_BASEROW_BASE_URL=https://api.baserow.io
+VITE_BASEROW_DATABASE_ID=296836
+VITE_BASEROW_CLIENTS_TABLE_ID=689319
+VITE_BASEROW_SCRIPTS_TABLE_ID=689333
+```
+
+**Deploy no Vercel:**
+📖 **Siga o guia completo:** [VERCEL_SETUP.md](./VERCEL_SETUP.md) para configurar as variáveis no painel do Vercel.
+
+### 🔧 **Estrutura do Baserow**
+
+Se quiser criar seu próprio banco Baserow:
 1. Acesse [Baserow.io](https://baserow.io) e crie uma conta
 2. Crie um novo banco de dados
 3. Crie duas tabelas com os campos especificados:
@@ -80,6 +102,29 @@ Para ativar o Firebase, crie um arquivo `.env`:
 3. Deploy automático funciona com ou sem Firebase
 
 ## 🛠️ Resolução de Problemas
+
+### 📖 Guias Completos de Troubleshooting
+
+- **Aplicação não funciona no Vercel:** [VERCEL_SETUP.md](./VERCEL_SETUP.md)
+- **Chat widget não abre:** [CHAT_TROUBLESHOOTING.md](./CHAT_TROUBLESHOOTING.md)
+
+### ⚡ Problemas Comuns
+
+#### 1. "Gerenciar Clientes" vazio no Vercel
+**Causa:** Variáveis de ambiente não configuradas
+**Solução:** Siga [VERCEL_SETUP.md](./VERCEL_SETUP.md)
+
+#### 2. Chat não abre no domínio do Vercel
+**Causas possíveis:**
+- Domínio não autorizado no chatbot (Dify, etc.)
+- Restrição de CORS
+- Script inválido ou expirado
+
+**Solução:** Siga [CHAT_TROUBLESHOOTING.md](./CHAT_TROUBLESHOOTING.md)
+
+#### 3. Funciona local mas não no Vercel
+**Causa:** Variáveis de ambiente do `.env` não são enviadas para o Vercel
+**Solução:** Configure manualmente no painel do Vercel (veja [VERCEL_SETUP.md](./VERCEL_SETUP.md))
 
 ### Erro 400 (Bad Request)
 

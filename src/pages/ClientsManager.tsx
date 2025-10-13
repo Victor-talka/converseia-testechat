@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Users, Eye, Trash2, Plus, ArrowLeft, Database, HardDrive, Edit, Copy, Link } from "lucide-react";
 import { clientService, scriptService, getStorageStatus } from "@/services/database";
 import { Client, ChatScript } from "@/types/database";
+import { ConfigStatus } from "@/components/ConfigStatus";
 
 const ClientsManager = () => {
   const [clients, setClients] = useState<Client[]>([]);
@@ -175,6 +176,9 @@ const ClientsManager = () => {
   return (
     <div className="min-h-screen p-4">
       <div className="max-w-6xl mx-auto space-y-6">
+        {/* Config Status Alert */}
+        <ConfigStatus />
+        
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">

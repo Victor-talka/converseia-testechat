@@ -9,6 +9,22 @@ const BASEROW_CONFIG = {
   }
 };
 
+// Log de debug para verificar configuração (remover em produção se necessário)
+console.log('🔧 Baserow Config:', {
+  hasApiToken: !!BASEROW_CONFIG.apiToken,
+  apiTokenPreview: BASEROW_CONFIG.apiToken ? `${BASEROW_CONFIG.apiToken.substring(0, 8)}...` : 'não definido',
+  baseUrl: BASEROW_CONFIG.baseUrl,
+  databaseId: BASEROW_CONFIG.databaseId,
+  clientsTableId: BASEROW_CONFIG.tables.clients,
+  scriptsTableId: BASEROW_CONFIG.tables.scripts,
+  envMode: import.meta.env.MODE,
+  envVars: {
+    VITE_BASEROW_API_TOKEN: import.meta.env.VITE_BASEROW_API_TOKEN ? 'definido' : 'não definido',
+    VITE_BASEROW_BASE_URL: import.meta.env.VITE_BASEROW_BASE_URL || 'não definido',
+    VITE_BASEROW_DATABASE_ID: import.meta.env.VITE_BASEROW_DATABASE_ID || 'não definido'
+  }
+});
+
 // Verificar se as configurações do Baserow estão disponíveis
 const hasBaserowConfig = () => {
   return BASEROW_CONFIG.apiToken && 
