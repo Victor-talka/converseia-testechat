@@ -239,34 +239,31 @@ export const scriptService = {
 
   // Buscar script por ID
   async getById(id: string): Promise<ChatScript | null> {
-    if (isBaserowAvailable()) {
-      try {
-        const response = await baserowRequest(`/api/database/rows/table/${BASEROW_CONFIG.tables.scripts}/${id}/`);
-        return mapBaserowScript(response);
-      } catch (error) {
-        console.error('Erro ao buscar script no Baserow, usando localStorage:', error);
-      }
-    }
+    console.log(`[scriptService.getById] Buscando script: ${id}`);
     
-    // Local fallback + compatibilidade com localStorage antigo
+    // Primeira tentativa: localStorage (sempre funciona)
     const scripts = localStorage_utils.getScripts();
     const found = scripts.find(script => script.id === id);
     
-    if (found) return found;
+    if (found) {
+      console.log(`[scriptService.getById] Script encontrado no localStorage: ${id}`);
+      return found;
+    }
     
-    // Compatibilidade com sistema antigo
+    // Compatibilidade com sistema antigo do localStorage
     try {
       const storedScripts = localStorage.getItem("chatbot-scripts");
       if (storedScripts) {
         const oldScripts = JSON.parse(storedScripts);
         const oldScript = oldScripts[id];
         if (oldScript) {
+          console.log(`[scriptService.getById] Script encontrado no sistema legacy: ${id}`);
           return {
             id,
             clientId: 'legacy',
             clientName: 'Cliente Legacy',
             script: oldScript.script,
-            title: 'Script Legacy',
+            title: oldScript.title || 'Script Legacy',
             isActive: true,
             createdAt: new Date(oldScript.createdAt || Date.now()),
             updatedAt: new Date(oldScript.createdAt || Date.now())
@@ -276,7 +273,21 @@ export const scriptService = {
     } catch (error) {
       console.error('Erro ao buscar script legacy:', error);
     }
+
+    // Só tentar Baserow por último (pode falhar)
+    if (isBaserowAvailable()) {
+      try {
+        console.log(`[scriptService.getById] Tentando Baserow para: ${id}`);
+        const response = await baserowRequest(`/api/database/rows/table/${BASEROW_CONFIG.tables.scripts}/${id}/`);
+        const script = mapBaserowScript(response);
+        console.log(`[scriptService.getById] Script encontrado no Baserow: ${id}`);
+        return script;
+      } catch (error) {
+        console.warn(`[scriptService.getById] Falha no Baserow para ${id}:`, error);
+      }
+    }
     
+    console.log(`[scriptService.getById] Script não encontrado: ${id}`);
     return null;
   },
 
