@@ -131,17 +131,36 @@ const Preview = () => {
     const idAtual = localStorage.getItem(CONVERSATION_STORAGE_KEY);
     if (!idAtual) return;
     conversaAtivaRef.current = idAtual;
-    if (widgetsArquivados.some(w => w.id === idAtual)) return;
+    
+    // Verificar se já existe no histórico
+    const historicoAtual = localStorage.getItem(WIDGETS_STORAGE_KEY);
+    let widgets: WidgetArquivado[] = [];
+    
+    try {
+      widgets = historicoAtual ? JSON.parse(historicoAtual) : [];
+    } catch {
+      widgets = [];
+    }
+    
+    if (widgets.some(w => w.id === idAtual)) return;
+    
     const novo: WidgetArquivado = {
       id: idAtual,
-      titulo: `Conversa ${widgetsArquivados.length + 1}`,
+      titulo: `Conversa ${widgets.length + 1}`,
       criadoEm: Date.now(),
       ultimaAtualizacao: Date.now(),
-      isActive: true
+      isActive: false
     };
-    const lista = [novo, ...widgetsArquivados.map(w => ({ ...w, isActive: false }))];
-    persistirWidgets(lista);
-  }, [widgetsArquivados]);
+    
+    const lista = [novo, ...widgets.map(w => ({ ...w, isActive: false }))];
+    
+    // Salvar no localStorage antes do reload
+    try {
+      localStorage.setItem(WIDGETS_STORAGE_KEY, JSON.stringify(lista));
+    } catch (error) {
+      console.error('Erro ao salvar histórico:', error);
+    }
+  }, []);
 
   // Captura mudança do ID de conversa via hook em localStorage e sessionStorage
   useEffect(() => {
@@ -387,50 +406,103 @@ const Preview = () => {
   // Cria novo widget com reinício completo
   const criarNovoWidget = async () => {
     setReiniciandoChat(true);
-    arquivarWidgetAtual();
     
     toast({
       title: "🔄 Criando nova conversa",
-      description: "Gerando um novo chat para você...",
+      description: "Recarregando página para limpar cache...",
     });
     
-    // Limpar completamente o estado do chat
-    localStorage.removeItem(CONVERSATION_STORAGE_KEY);
-    sessionStorage.removeItem(CONVERSATION_STORAGE_KEY);
+    // Arquivar conversa atual antes de limpar
+    arquivarWidgetAtual();
     
-    // Limpar cookies relacionados ao chat
-    document.cookie.split(';').forEach(cookie => {
-      const eqPos = cookie.indexOf('=');
-      const name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim();
-      if (name.includes('chat') || name.includes('conversation') || name.includes('widget')) {
+    // Salvar o histórico de widgets antes de limpar
+    const historicoWidgets = localStorage.getItem(WIDGETS_STORAGE_KEY);
+    
+    // Limpar TUDO relacionado ao chat, EXCETO o histórico de widgets
+    try {
+      // 1. LocalStorage - remover tudo exceto histórico de widgets
+      const keysToRemove = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key !== WIDGETS_STORAGE_KEY && (
+          key.includes('chat') || 
+          key.includes('conversation') || 
+          key.includes('widget') ||
+          key.includes('dify') ||
+          key.includes('bot') ||
+          key.includes('__df__') || // Dify specific
+          key.includes('embed')
+        )) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach(key => {
+        console.log('🗑️ Removendo:', key);
+        localStorage.removeItem(key);
+      });
+      
+      // Restaurar histórico de widgets
+      if (historicoWidgets) {
+        localStorage.setItem(WIDGETS_STORAGE_KEY, historicoWidgets);
+      }
+      
+      // 2. SessionStorage - limpar tudo
+      sessionStorage.clear();
+      
+      // 3. Cookies - limpar todos
+      document.cookie.split(';').forEach(cookie => {
+        const eqPos = cookie.indexOf('=');
+        const name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim();
+        // Limpar cookie em todos os domínios possíveis
+        document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=${window.location.hostname}`;
         document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=.${window.location.hostname}`;
         document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
-      }
-    });
-    
-    // Resetar referências
-    conversaAtivaRef.current = null;
-    ultimoIdConversaRef.current = null;
-    
-    // Remover widget atual completamente
-    document.querySelectorAll('ra-chatbot-widget, [id*="chatbot"], [class*="chatbot"]').forEach(el => el.remove());
-    const oldScript = document.getElementById(WIDGET_SCRIPT_ID);
-    if (oldScript) oldScript.remove();
-    
-    setIsLoading(true);
-    
-    // Aguardar um pouco antes de recriar
-    setTimeout(() => {
-      injetarWidget();
-      setReiniciandoChat(false);
-      
-      toast({
-        title: "✅ Nova conversa criada!",
-        description: "O chat foi reiniciado com sucesso",
       });
-    }, 500);
+      
+      // 4. Limpar Cache da página (Service Workers)
+      if ('caches' in window) {
+        caches.keys().then(names => {
+          names.forEach(name => {
+            console.log('🗑️ Limpando cache:', name);
+            caches.delete(name);
+          });
+        });
+      }
+      
+      // 5. Limpar IndexedDB (se existir)
+      if (window.indexedDB) {
+        try {
+          const dbs = await window.indexedDB.databases?.();
+          dbs?.forEach(db => {
+            if (db.name) {
+              console.log('🗑️ Limpando IndexedDB:', db.name);
+              window.indexedDB.deleteDatabase(db.name);
+            }
+          });
+        } catch (error) {
+          console.warn('Não foi possível limpar IndexedDB:', error);
+        }
+      }
+      
+    } catch (error) {
+      console.error('Erro ao limpar dados:', error);
+    }
     
-    setSidebarOpen(false);
+    // Gerar timestamp único para forçar reload completo
+    const timestamp = Date.now();
+    const novaUrl = `${window.location.pathname}?refresh=${timestamp}`;
+    
+    console.log('🔄 Recarregando página:', novaUrl);
+    
+    // Aguardar um momento e fazer reload completo
+    setTimeout(() => {
+      // Hard reload: força recarregar todos os recursos
+      window.location.href = novaUrl;
+      // Fallback caso location.href não funcione
+      setTimeout(() => {
+        window.location.reload();
+      }, 100);
+    }, 300);
   };
 
   // Seleciona widget arquivado
@@ -470,6 +542,23 @@ const Preview = () => {
       setError("ID do preview não encontrado");
       setIsLoading(false);
       return;
+    }
+
+    // Verificar se é um reload de nova conversa
+    const urlParams = new URLSearchParams(window.location.search);
+    const isRefresh = urlParams.get('refresh');
+    
+    if (isRefresh) {
+      // Limpar URL para ficar limpa
+      window.history.replaceState({}, '', window.location.pathname);
+      
+      // Mostrar toast de sucesso
+      setTimeout(() => {
+        toast({
+          title: "✅ Nova conversa iniciada!",
+          description: "Cache limpo. Chat completamente reiniciado.",
+        });
+      }, 500);
     }
 
     const loadScript = async () => {
