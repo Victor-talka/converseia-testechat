@@ -244,28 +244,43 @@ const ClientsManager = () => {
                             {client.email && `${client.email} • `}
                             Criado em {client.createdAt.toLocaleDateString('pt-BR')}
                           </div>
-                          {client.slug && (
-                            <div className="flex items-center gap-2 mt-1">
-                              <Link className="w-3 h-3" />
-                              <span className="font-mono text-xs text-primary">
-                                {window.location.origin}/{client.slug}
-                              </span>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-5 px-2"
-                                onClick={() => {
-                                  navigator.clipboard.writeText(`${window.location.origin}/${client.slug}`);
-                                  toast({
-                                    title: "Link copiado!",
-                                    description: "URL do cliente copiada para a área de transferência",
-                                  });
-                                }}
-                              >
-                                <Copy className="w-3 h-3" />
-                              </Button>
-                            </div>
-                          )}
+                          {client.slug && (() => {
+                            const hostname = window.location.hostname;
+                            let dominioBase = 'converseia.com';
+                            
+                            if (hostname.includes('converseia.com')) {
+                              dominioBase = 'converseia.com';
+                            } else if (hostname.includes('vercel.app')) {
+                              dominioBase = hostname;
+                            } else if (hostname === 'localhost') {
+                              dominioBase = 'localhost:5173';
+                            }
+                            
+                            const urlSubdominio = `https://${client.slug}.${dominioBase}`;
+                            
+                            return (
+                              <div className="flex items-center gap-2 mt-1">
+                                <Link className="w-3 h-3" />
+                                <span className="font-mono text-xs text-primary">
+                                  {urlSubdominio}
+                                </span>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-5 px-2"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(urlSubdominio);
+                                    toast({
+                                      title: "Link copiado!",
+                                      description: "URL do cliente copiada para a área de transferência",
+                                    });
+                                  }}
+                                >
+                                  <Copy className="w-3 h-3" />
+                                </Button>
+                              </div>
+                            );
+                          })()}
                         </CardDescription>
                       </div>
                       <div className="flex gap-2">
@@ -302,11 +317,26 @@ const ClientsManager = () => {
                                   onChange={(e) => setClientForm(prev => ({ ...prev, slug: e.target.value }))}
                                   placeholder="meu-cliente-123"
                                 />
-                                {clientForm.slug && (
-                                  <p className="text-xs text-muted-foreground mt-1">
-                                    URL: <span className="font-mono text-primary">{window.location.origin}/{clientForm.slug}</span>
-                                  </p>
-                                )}
+                                {clientForm.slug && (() => {
+                                  const hostname = window.location.hostname;
+                                  let dominioBase = 'converseia.com';
+                                  
+                                  if (hostname.includes('converseia.com')) {
+                                    dominioBase = 'converseia.com';
+                                  } else if (hostname.includes('vercel.app')) {
+                                    dominioBase = hostname;
+                                  } else if (hostname === 'localhost') {
+                                    dominioBase = 'localhost:5173';
+                                  }
+                                  
+                                  const urlSubdominio = `https://${clientForm.slug}.${dominioBase}`;
+                                  
+                                  return (
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                      URL: <span className="font-mono text-primary">{urlSubdominio}</span>
+                                    </p>
+                                  );
+                                })()}
                               </div>
                               <div>
                                 <Label htmlFor="client-email">Email</Label>

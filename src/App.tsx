@@ -22,8 +22,7 @@ const App = () => (
           <Route path="/setup" element={<Setup />} />
           <Route path="/clients" element={<ClientsManager />} />
           <Route path="/preview/:id" element={<Preview />} /> {/* Rota antiga para compatibilidade */}
-          {/* Nova rota com slug do cliente */}
-          <Route path="/:clientSlug" element={<Preview />} />
+          {/* Removido: Rota com slug - agora apenas subdomínio */}
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

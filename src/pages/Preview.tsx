@@ -597,7 +597,7 @@ const Preview = () => {
 
     const loadScript = async () => {
       try {
-        // 🆕 PRIORIDADE 1: Detectar subdomínio
+        // 🆕 APENAS SUBDOMÍNIO: Detectar subdomínio obrigatório
         const subdominioDetectado = detectarSubdominio();
         
         if (subdominioDetectado) {
@@ -619,46 +619,17 @@ const Preview = () => {
             return;
           }
           
-          setError(`Cliente "${subdominioDetectado}" não encontrado. Verifique a configuração do subdomínio.`);
+          setError(`Cliente "${subdominioDetectado}" não encontrado. Verifique se o cliente está cadastrado no sistema.`);
           setIsLoading(false);
           return;
         }
         
-        // PRIORIDADE 2: Slug ou ID na URL
-        const param = id || clientSlug;
+        // Fallback apenas para rota /preview/:id (compatibilidade com links antigos)
+        const param = id;
         
-        if (!param) {
-          setError("Nenhum cliente especificado. Use um subdomínio (cliente.converseia.com) ou acesse via /slug");
-          setIsLoading(false);
-          return;
-        }
-
-        // Verificar se é um slug (não numérico) ou ID (numérico)
-        const isSlug = isNaN(Number(param));
-        
-        console.log(`🔍 Carregando via ${isSlug ? 'SLUG' : 'ID'}: ${param}`);
-
-        if (isSlug) {
-          // Carregar por slug do cliente
-          const script = await scriptService.getByClientSlug(param);
+        if (param) {
+          console.log(`🔍 Carregando via ID (compatibilidade): ${param}`);
           
-          if (script) {
-            setScriptData(script);
-            setSlugDetectado(param);
-            
-            // Carregar dados do cliente também
-            const client = await clientService.getBySlug(param);
-            if (client) {
-              setClientData(client);
-              console.log(`✅ Cliente carregado: ${client.name}`);
-            }
-            return;
-          }
-          
-          setError(`Cliente "${param}" não encontrado ou sem script ativo. Verifique se o slug está correto.`);
-          setIsLoading(false);
-          return;
-        } else {
           // Carregar por ID (modo antigo)
           const script = await scriptService.getById(param);
           
@@ -684,7 +655,13 @@ const Preview = () => {
 
           setError("Script não encontrado. O link pode estar expirado.");
           setIsLoading(false);
+          return;
         }
+
+        // Nenhum subdomínio e nenhum ID = erro
+        setError("Acesso inválido. Use o subdomínio correto do cliente (ex: cliente.converseia.com)");
+        setIsLoading(false);
+        
       } catch (err) {
         console.error("Error loading script:", err);
         setError(`Erro ao carregar o script: ${err instanceof Error ? err.message : "Erro desconhecido"}`);
