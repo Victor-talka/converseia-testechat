@@ -1,6 +1,7 @@
 export interface Client {
   id: string;
   name: string;
+  slug: string; // URL amigável, ex: "nomecliente55"
   email?: string;
   phone?: string;
   company?: string;
@@ -12,6 +13,7 @@ export interface ChatScript {
   id: string;
   clientId: string;
   clientName: string;
+  clientSlug: string; // Slug do cliente para URL
   script: string;
   title?: string;
   description?: string;
@@ -22,6 +24,7 @@ export interface ChatScript {
 
 export interface CreateClientData {
   name: string;
+  slug: string; // URL amigável obrigatório
   email?: string;
   phone?: string;
   company?: string;
@@ -30,6 +33,7 @@ export interface CreateClientData {
 export interface CreateScriptData {
   clientId: string;
   clientName: string;
+  clientSlug: string; // Slug do cliente
   script: string;
   title?: string;
   description?: string;

@@ -20,7 +20,7 @@ const ClientsManager = () => {
   const [editingScript, setEditingScript] = useState<ChatScript | null>(null);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [scriptForm, setScriptForm] = useState({ title: '', script: '' });
-  const [clientForm, setClientForm] = useState({ name: '', email: '', company: '' });
+  const [clientForm, setClientForm] = useState({ name: '', email: '', company: '', slug: '' });
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -90,7 +90,7 @@ const ClientsManager = () => {
 
   const handleEditClient = (client: Client) => {
     setEditingClient(client);
-    setClientForm({ name: client.name, email: client.email || '', company: client.company || '' });
+    setClientForm({ name: client.name, email: client.email || '', company: client.company || '', slug: client.slug || '' });
   };
 
   const handleSaveScript = async () => {
@@ -126,7 +126,8 @@ const ClientsManager = () => {
       await clientService.update(editingClient.id, {
         name: clientForm.name,
         email: clientForm.email,
-        company: clientForm.company
+        company: clientForm.company,
+        slug: clientForm.slug
       });
       
       toast({
@@ -237,10 +238,34 @@ const ClientsManager = () => {
                           <Users className="w-5 h-5 text-primary" />
                           {client.name}
                         </CardTitle>
-                        <CardDescription>
-                          {client.company && `${client.company} • `}
-                          {client.email && `${client.email} • `}
-                          Criado em {client.createdAt.toLocaleDateString('pt-BR')}
+                        <CardDescription className="space-y-1">
+                          <div>
+                            {client.company && `${client.company} • `}
+                            {client.email && `${client.email} • `}
+                            Criado em {client.createdAt.toLocaleDateString('pt-BR')}
+                          </div>
+                          {client.slug && (
+                            <div className="flex items-center gap-2 mt-1">
+                              <Link className="w-3 h-3" />
+                              <span className="font-mono text-xs text-primary">
+                                {window.location.origin}/{client.slug}
+                              </span>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-5 px-2"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(`${window.location.origin}/${client.slug}`);
+                                  toast({
+                                    title: "Link copiado!",
+                                    description: "URL do cliente copiada para a área de transferência",
+                                  });
+                                }}
+                              >
+                                <Copy className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          )}
                         </CardDescription>
                       </div>
                       <div className="flex gap-2">
@@ -268,6 +293,20 @@ const ClientsManager = () => {
                                   value={clientForm.name}
                                   onChange={(e) => setClientForm(prev => ({ ...prev, name: e.target.value }))}
                                 />
+                              </div>
+                              <div>
+                                <Label htmlFor="client-slug">Slug da URL</Label>
+                                <Input
+                                  id="client-slug"
+                                  value={clientForm.slug}
+                                  onChange={(e) => setClientForm(prev => ({ ...prev, slug: e.target.value }))}
+                                  placeholder="meu-cliente-123"
+                                />
+                                {clientForm.slug && (
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    URL: <span className="font-mono text-primary">{window.location.origin}/{clientForm.slug}</span>
+                                  </p>
+                                )}
                               </div>
                               <div>
                                 <Label htmlFor="client-email">Email</Label>

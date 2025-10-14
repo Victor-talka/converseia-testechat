@@ -11,6 +11,7 @@ import { Client } from "@/types/database";
 const ScriptInput = () => {
   const [script, setScript] = useState("");
   const [clientName, setClientName] = useState("");
+  const [clientSlug, setClientSlug] = useState(""); // Novo campo
   const [clientEmail, setClientEmail] = useState("");
   const [clientCompany, setClientCompany] = useState("");
   const [generatedLink, setGeneratedLink] = useState("");
@@ -21,6 +22,27 @@ const ScriptInput = () => {
   const [storageStatus, setStorageStatus] = useState(getStorageStatus());
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  // Função para gerar slug a partir do nome
+  const generateSlug = (name: string): string => {
+    return name
+      .toLowerCase()
+      .normalize('NFD') // Remove acentos
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-') // Substitui caracteres especiais por -
+      .replace(/^-+|-+$/g, '') // Remove - no início e fim
+      .substring(0, 50); // Limita tamanho
+  };
+
+  // Gerar slug automaticamente quando nome muda
+  const handleClientNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const name = e.target.value;
+    setClientName(name);
+    if (isNewClient) {
+      const autoSlug = generateSlug(name);
+      setClientSlug(autoSlug);
+    }
+  };
 
   // Carregar clientes ao montar o componente
   useEffect(() => {
@@ -65,6 +87,15 @@ const ScriptInput = () => {
       return;
     }
 
+    if (isNewClient && !clientSlug.trim()) {
+      toast({
+        title: "Slug obrigatório",
+        description: "Por favor, defina um slug para a URL do cliente",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!isNewClient && !selectedClientId) {
       toast({
         title: "Cliente não selecionado",
@@ -79,29 +110,46 @@ const ScriptInput = () => {
     try {
       let finalClientId = selectedClientId;
       let finalClientName = clientName;
+      let finalClientSlug = clientSlug;
 
       // Se for novo cliente, criar primeiro
       if (isNewClient) {
         try {
+          // Verificar se slug já existe
+          const existingClient = await clientService.getBySlug(clientSlug);
+          if (existingClient) {
+            toast({
+              title: "Slug já existe",
+              description: `O slug "${clientSlug}" já está em uso. Por favor, escolha outro.`,
+              variant: "destructive",
+            });
+            setLoading(false);
+            return;
+          }
+
           finalClientId = await clientService.create({
             name: clientName,
+            slug: clientSlug,
             email: clientEmail || undefined,
             company: clientCompany || undefined,
           });
           finalClientName = clientName;
+          finalClientSlug = clientSlug;
           // Recarregar lista de clientes
           await loadClients();
         } catch (error) {
           toast({
             title: "Erro ao criar cliente",
-            description: "Não foi possível cadastrar o cliente no Baserow. Verifique sua conexão ou tente novamente.",
+            description: "Não foi possível cadastrar o cliente. Verifique sua conexão ou tente novamente.",
             variant: "destructive",
           });
+          setLoading(false);
           return;
         }
       } else {
         const selectedClient = clients.find(c => c.id === selectedClientId);
         finalClientName = selectedClient?.name || "Cliente";
+        finalClientSlug = selectedClient?.slug || "cliente";
       }
 
       // Criar script no banco
@@ -110,32 +158,35 @@ const ScriptInput = () => {
         scriptId = await scriptService.create({
           clientId: finalClientId,
           clientName: finalClientName,
+          clientSlug: finalClientSlug,
           script: script,
           title: `Script - ${finalClientName}`,
         });
       } catch (error) {
         toast({
           title: "Erro ao criar script",
-          description: "Não foi possível cadastrar o script no Baserow. Verifique sua conexão ou tente novamente.",
+          description: "Não foi possível cadastrar o script. Verifique sua conexão ou tente novamente.",
           variant: "destructive",
         });
+        setLoading(false);
         return;
       }
 
-      // Generate link
+      // Generate link com slug
       if (scriptId) {
-        const link = `${window.location.origin}/preview/${scriptId}`;
+        const link = `${window.location.origin}/${finalClientSlug}`;
         setGeneratedLink(link);
 
         toast({
-          title: "Preview criado!",
-          description: `Script do cliente ${finalClientName} salvo com sucesso`,
+          title: "Link criado com sucesso!",
+          description: `URL personalizada: /${finalClientSlug}`,
         });
       }
 
       // Limpar campos se for novo cliente
       if (isNewClient) {
         setClientName("");
+        setClientSlug("");
         setClientEmail("");
         setClientCompany("");
       }
@@ -233,9 +284,40 @@ const ScriptInput = () => {
               <Input
                 placeholder="Nome do cliente *"
                 value={clientName}
-                onChange={(e) => setClientName(e.target.value)}
+                onChange={handleClientNameChange}
                 className="col-span-1 md:col-span-2"
               />
+              
+              {/* Campo de Slug */}
+              <div className="col-span-1 md:col-span-2 space-y-2">
+                <div className="flex items-center gap-2">
+                  <Input
+                    placeholder="slug-do-cliente *"
+                    value={clientSlug}
+                    onChange={(e) => setClientSlug(e.target.value)}
+                    className="flex-1"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setClientSlug(generateSlug(clientName))}
+                    disabled={!clientName}
+                    title="Gerar slug automaticamente"
+                  >
+                    <Sparkles className="w-4 h-4" />
+                  </Button>
+                </div>
+                {clientSlug && (
+                  <div className="text-xs text-muted-foreground bg-secondary/30 p-2 rounded-md">
+                    <span className="font-medium">URL do cliente:</span>{" "}
+                    <span className="font-mono text-primary">
+                      {window.location.origin}/{clientSlug}
+                    </span>
+                  </div>
+                )}
+              </div>
+
               <Input
                 placeholder="Email (opcional)"
                 type="email"

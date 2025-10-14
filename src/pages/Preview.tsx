@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { AlertCircle, MessageCircle, Menu, Edit3, MoreHorizontal, Trash2, Plus, RefreshCw } from "lucide-react";
-import { scriptService } from "@/services/database";
+import { scriptService, clientService } from "@/services/database";
 import { ChatScript } from "@/types/database";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -25,7 +25,7 @@ type WidgetArquivado = {
 };
 
 const Preview = () => {
-  const { id } = useParams();
+  const { id, clientSlug } = useParams(); // Pode ser id OU clientSlug
   const navigate = useNavigate();
   const { toast } = useToast();
   const [error, setError] = useState("");
@@ -42,6 +42,7 @@ const Preview = () => {
   const [reiniciandoChat, setReiniciandoChat] = useState(false);
   const [widgetQuebrado, setWidgetQuebrado] = useState(false);
   const ultimoIdConversaRef = useRef<string | null>(null);
+  const [clientData, setClientData] = useState<any>(null); // Dados do cliente
 
   // Carrega widgets arquivados do localStorage
   useEffect(() => {
@@ -538,8 +539,10 @@ const Preview = () => {
   };
 
   useEffect(() => {
-    if (!id) {
-      setError("ID do preview não encontrado");
+    const param = id || clientSlug;
+    
+    if (!param) {
+      setError("Parâmetro de rota não encontrado. Use /nomecliente ou /preview/123");
       setIsLoading(false);
       return;
     }
@@ -563,34 +566,66 @@ const Preview = () => {
 
     const loadScript = async () => {
       try {
-        const script = await scriptService.getById(id);
+        // Determinar se está usando slug do cliente ou ID do script
+        const param = id || clientSlug;
         
-        if (script) {
-          setScriptData(script);
+        if (!param) {
+          setError("Parâmetro de rota não encontrado");
+          setIsLoading(false);
           return;
         }
 
-        // Fallback localStorage
-        const storedScripts = localStorage.getItem("chatbot-scripts");
-        if (!storedScripts) {
+        // Verificar se é um slug (não numérico) ou ID (numérico)
+        const isSlug = isNaN(Number(param));
+        
+        console.log(`🔍 Carregando via ${isSlug ? 'SLUG' : 'ID'}: ${param}`);
+
+        if (isSlug) {
+          // Carregar por slug do cliente
+          const script = await scriptService.getByClientSlug(param);
+          
+          if (script) {
+            setScriptData(script);
+            
+            // Carregar dados do cliente também
+            const client = await clientService.getBySlug(param);
+            if (client) {
+              setClientData(client);
+              console.log(`✅ Cliente carregado: ${client.name}`);
+            }
+            return;
+          }
+          
+          setError(`Cliente "${param}" não encontrado ou sem script ativo. Verifique se o slug está correto.`);
+          setIsLoading(false);
+          return;
+        } else {
+          // Carregar por ID (modo antigo)
+          const script = await scriptService.getById(param);
+          
+          if (script) {
+            setScriptData(script);
+            return;
+          }
+
+          // Fallback localStorage (compatibilidade)
+          const storedScripts = localStorage.getItem("chatbot-scripts");
+          if (storedScripts) {
+            const scripts = JSON.parse(storedScripts);
+            const localScript = scripts[param];
+            
+            if (localScript) {
+              setScriptData({
+                ...localScript,
+                script: localScript.script
+              });
+              return;
+            }
+          }
+
           setError("Script não encontrado. O link pode estar expirado.");
           setIsLoading(false);
-          return;
         }
-
-        const scripts = JSON.parse(storedScripts);
-        const localScript = scripts[id];
-        
-        if (!localScript) {
-          setError("Script não encontrado para este ID.");
-          setIsLoading(false);
-          return;
-        }
-
-        setScriptData({
-          ...localScript,
-          script: localScript.script
-        });
       } catch (err) {
         console.error("Error loading script:", err);
         setError(`Erro ao carregar o script: ${err instanceof Error ? err.message : "Erro desconhecido"}`);
@@ -599,7 +634,7 @@ const Preview = () => {
     };
 
     loadScript();
-  }, [id]);
+  }, [id, clientSlug, toast]); // Atualizado com novas dependências
 
   // Injeta widget quando script carrega
   useEffect(() => {

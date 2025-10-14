@@ -54,6 +54,7 @@ const localStorage_utils = {
 const mapBaserowClient = (row: any): Client => ({
   id: row.id.toString(),
   name: row.field_5700970 || '',
+  slug: row.field_5701042 || '', // Novo campo: slug
   email: row.field_5701032 || '',
   company: row.field_5701033 || '',
   createdAt: new Date(row.created_on || Date.now()),
@@ -64,6 +65,7 @@ const mapBaserowScript = (row: any): ChatScript => ({
   id: row.id.toString(),
   clientId: row.field_5701034?.toString() || '',
   clientName: row.field_5701038 || '',
+  clientSlug: row.field_5701043 || '', // Novo campo: clientSlug
   script: row.field_5701039 || '',
   title: row.field_5701040 || '',
   isActive: row.field_5701041 !== false,
@@ -81,6 +83,7 @@ export const clientService = {
           method: 'POST',
           body: JSON.stringify({
             field_5700970: data.name,     // name
+            field_5701042: data.slug,      // slug (novo campo)
             field_5701032: data.email || '',  // email 
             field_5701033: data.company || '' // company
           })
@@ -155,6 +158,25 @@ export const clientService = {
     }
   },
 
+  // Buscar cliente por slug
+  async getBySlug(slug: string): Promise<Client | null> {
+    if (isBaserowAvailable()) {
+      try {
+        // Buscar com filtro por slug
+        const response = await baserowRequest(`/api/database/rows/table/${BASEROW_CONFIG.tables.clients}/?filter__field_5701042__equal=${slug}`);
+        if (response.results && response.results.length > 0) {
+          return mapBaserowClient(response.results[0]);
+        }
+      } catch (error) {
+        console.error('Erro ao buscar cliente por slug no Baserow:', error);
+      }
+    }
+    
+    // Fallback local
+    const clients = localStorage_utils.getClients();
+    return clients.find(client => client.slug === slug) || null;
+  },
+
   // Deletar cliente
   async delete(id: string): Promise<void> {
     if (isBaserowAvailable()) {
@@ -187,6 +209,7 @@ export const scriptService = {
             body: JSON.stringify({
             field_5701034: clientIdNumber,
             field_5701038: data.clientName,
+            field_5701043: data.clientSlug, // Novo campo: clientSlug
             field_5701039: data.script,
             field_5701040: data.title || `Script - ${data.clientName}`,
             field_5701041: true
@@ -262,6 +285,7 @@ export const scriptService = {
             id,
             clientId: 'legacy',
             clientName: 'Cliente Legacy',
+            clientSlug: 'legacy',
             script: oldScript.script,
             title: oldScript.title || 'Script Legacy',
             isActive: true,
@@ -289,6 +313,26 @@ export const scriptService = {
     
     console.log(`[scriptService.getById] Script não encontrado: ${id}`);
     return null;
+  },
+
+  // Buscar script ativo por slug do cliente
+  async getByClientSlug(clientSlug: string): Promise<ChatScript | null> {
+    if (isBaserowAvailable()) {
+      try {
+        // Buscar com filtro por clientSlug e isActive
+        const response = await baserowRequest(`/api/database/rows/table/${BASEROW_CONFIG.tables.scripts}/?filter__field_5701043__equal=${clientSlug}&filter__field_5701041__boolean=true`);
+        if (response.results && response.results.length > 0) {
+          return mapBaserowScript(response.results[0]);
+        }
+      } catch (error) {
+        console.error('Erro ao buscar script por slug do cliente no Baserow:', error);
+      }
+    }
+    
+    // Fallback local
+    const scripts = localStorage_utils.getScripts();
+    const activeScript = scripts.find(script => script.clientSlug === clientSlug && script.isActive);
+    return activeScript || null;
   },
 
   // Buscar scripts por cliente

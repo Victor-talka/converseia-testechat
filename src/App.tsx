@@ -20,8 +20,10 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/setup" element={<Setup />} />
-          <Route path="/preview/:id" element={<Preview />} />
           <Route path="/clients" element={<ClientsManager />} />
+          <Route path="/preview/:id" element={<Preview />} /> {/* Rota antiga para compatibilidade */}
+          {/* Nova rota com slug do cliente */}
+          <Route path="/:clientSlug" element={<Preview />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
