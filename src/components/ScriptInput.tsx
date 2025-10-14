@@ -7,6 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Copy, Sparkles, Code2, User, Plus, Users, Database, HardDrive } from "lucide-react";
 import { clientService, scriptService, getStorageStatus } from "@/services/database";
 import { Client } from "@/types/database";
+import { addDomainToVercel, hasVercelConfig } from "@/lib/vercel";
 
 const ScriptInput = () => {
   const [script, setScript] = useState("");
@@ -174,6 +175,26 @@ const ScriptInput = () => {
 
       // Generate link APENAS com subdomínio (sem fallback)
       if (scriptId) {
+        // 🆕 ADICIONAR DOMÍNIO NO VERCEL AUTOMATICAMENTE
+        if (hasVercelConfig()) {
+          console.log(`🚀 Adicionando domínio ${finalClientSlug}.converseia.com ao Vercel...`);
+          
+          const vercelResult = await addDomainToVercel(finalClientSlug);
+          
+          if (vercelResult.success) {
+            console.log(`✅ Domínio adicionado ao Vercel: ${vercelResult.domain}`);
+            toast({
+              title: "Domínio configurado!",
+              description: `${vercelResult.domain} foi adicionado ao Vercel automaticamente`,
+            });
+          } else {
+            console.warn(`⚠️ Não foi possível adicionar domínio ao Vercel: ${vercelResult.message}`);
+            // Não bloqueia - apenas avisa
+          }
+        } else {
+          console.log('ℹ️ Vercel API não configurada - domínio não será adicionado automaticamente');
+        }
+
         // Extrair domínio base (ex: converseia.com de chat-teste.converseia.com)
         const hostname = window.location.hostname;
         const protocol = window.location.protocol;
@@ -201,8 +222,14 @@ const ScriptInput = () => {
               <p className="font-semibold">🌐 Domínio do Cliente:</p>
               <p className="font-mono text-xs break-all">{linkComSubdominio}</p>
               <p className="text-xs text-muted-foreground mt-2">Configure este domínio no gerador do script!</p>
+              {hasVercelConfig() && (
+                <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                  ✅ Domínio adicionado automaticamente no Vercel
+                </p>
+              )}
             </div>
           ),
+          duration: 8000,
         });
       }
 
