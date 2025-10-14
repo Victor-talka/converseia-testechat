@@ -172,14 +172,41 @@ const ScriptInput = () => {
         return;
       }
 
-      // Generate link com slug
+      // Generate link com subdomínio
       if (scriptId) {
-        const link = `${window.location.origin}/${finalClientSlug}`;
-        setGeneratedLink(link);
+        // Extrair domínio base (ex: converseia.com de chat-teste.converseia.com)
+        const hostname = window.location.hostname;
+        const protocol = window.location.protocol;
+        
+        let dominioBase = 'converseia.com'; // Valor padrão
+        
+        // Detectar domínio base automaticamente
+        if (hostname.includes('converseia.com')) {
+          dominioBase = 'converseia.com';
+        } else if (hostname.includes('vercel.app')) {
+          dominioBase = hostname; // Para Vercel, usar hostname completo
+        } else if (hostname === 'localhost') {
+          dominioBase = 'localhost:5173'; // Para desenvolvimento local
+        }
+        
+        // Gerar URL com subdomínio: cliente1.converseia.com
+        const linkComSubdominio = `${protocol}//${finalClientSlug}.${dominioBase}`;
+        
+        // Também gerar link com slug (fallback)
+        const linkComSlug = `${window.location.origin}/${finalClientSlug}`;
+        
+        setGeneratedLink(linkComSubdominio);
 
         toast({
           title: "Link criado com sucesso!",
-          description: `URL personalizada: /${finalClientSlug}`,
+          description: (
+            <div className="space-y-1">
+              <p className="font-semibold">🌐 URL Principal (subdomínio):</p>
+              <p className="font-mono text-xs">{linkComSubdominio}</p>
+              <p className="text-xs text-muted-foreground mt-2">Configure este domínio no gerador do script!</p>
+              <p className="text-xs text-muted-foreground mt-1">Fallback: {linkComSlug}</p>
+            </div>
+          ),
         });
       }
 
@@ -309,11 +336,22 @@ const ScriptInput = () => {
                   </Button>
                 </div>
                 {clientSlug && (
-                  <div className="text-xs text-muted-foreground bg-secondary/30 p-2 rounded-md">
-                    <span className="font-medium">URL do cliente:</span>{" "}
-                    <span className="font-mono text-primary">
-                      {window.location.origin}/{clientSlug}
-                    </span>
+                  <div className="text-xs space-y-2 bg-secondary/30 p-3 rounded-md border border-primary/20">
+                    <div>
+                      <span className="font-medium text-foreground">🌐 Domínio do Cliente:</span>
+                      <p className="font-mono text-primary mt-1 break-all">
+                        https://{clientSlug}.converseia.com
+                      </p>
+                    </div>
+                    <div className="pt-2 border-t border-border/30">
+                      <span className="font-medium text-foreground">📋 Fallback (dev/testes):</span>
+                      <p className="font-mono text-muted-foreground mt-1 text-xs">
+                        {window.location.origin}/{clientSlug}
+                      </p>
+                    </div>
+                    <div className="pt-2 text-xs text-amber-600 dark:text-amber-400">
+                      ⚠️ Use o domínio principal ao configurar o script do chatbot
+                    </div>
                   </div>
                 )}
               </div>

@@ -44,6 +44,37 @@ const Preview = () => {
   const ultimoIdConversaRef = useRef<string | null>(null);
   const [clientData, setClientData] = useState<any>(null); // Dados do cliente
 
+  // 🆕 DETECTAR SUBDOMÍNIO
+  const detectarSubdominio = (): string | null => {
+    const hostname = window.location.hostname;
+    console.log('🌐 Hostname detectado:', hostname);
+    
+    // Lista de domínios base (principais)
+    const dominiosBase = [
+      'converseia.com',
+      'localhost',
+      'vercel.app'
+    ];
+    
+    // Verificar se é um subdomínio
+    for (const dominioBase of dominiosBase) {
+      if (hostname.endsWith(dominioBase) && hostname !== dominioBase) {
+        // Extrair subdomínio: cliente1.converseia.com -> cliente1
+        const subdomain = hostname.replace(`.${dominioBase}`, '');
+        
+        // Ignorar subdomínios reservados (www, api, etc)
+        const subdomainReservados = ['www', 'api', 'admin', 'mail', 'ftp', 'chat-teste'];
+        if (!subdomainReservados.includes(subdomain)) {
+          console.log('✅ Subdomínio detectado:', subdomain);
+          return subdomain;
+        }
+      }
+    }
+    
+    console.log('❌ Nenhum subdomínio de cliente detectado');
+    return null;
+  };
+
   // Carrega widgets arquivados do localStorage
   useEffect(() => {
     try {
@@ -566,11 +597,38 @@ const Preview = () => {
 
     const loadScript = async () => {
       try {
-        // Determinar se está usando slug do cliente ou ID do script
+        // 🆕 PRIORIDADE 1: Detectar subdomínio
+        const subdominioDetectado = detectarSubdominio();
+        
+        if (subdominioDetectado) {
+          console.log(`🌐 Carregando via SUBDOMÍNIO: ${subdominioDetectado}`);
+          
+          // Buscar por slug do cliente (subdomínio = slug)
+          const script = await scriptService.getByClientSlug(subdominioDetectado);
+          
+          if (script) {
+            setScriptData(script);
+            setSlugDetectado(subdominioDetectado);
+            
+            // Carregar dados do cliente
+            const client = await clientService.getBySlug(subdominioDetectado);
+            if (client) {
+              setClientData(client);
+              console.log(`✅ Cliente carregado via subdomínio: ${client.name}`);
+            }
+            return;
+          }
+          
+          setError(`Cliente "${subdominioDetectado}" não encontrado. Verifique a configuração do subdomínio.`);
+          setIsLoading(false);
+          return;
+        }
+        
+        // PRIORIDADE 2: Slug ou ID na URL
         const param = id || clientSlug;
         
         if (!param) {
-          setError("Parâmetro de rota não encontrado");
+          setError("Nenhum cliente especificado. Use um subdomínio (cliente.converseia.com) ou acesse via /slug");
           setIsLoading(false);
           return;
         }
@@ -586,6 +644,7 @@ const Preview = () => {
           
           if (script) {
             setScriptData(script);
+            setSlugDetectado(param);
             
             // Carregar dados do cliente também
             const client = await clientService.getBySlug(param);
