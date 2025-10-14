@@ -198,6 +198,7 @@ const ScriptInput = () => {
         // Extrair domínio base (ex: converseia.com de chat-teste.converseia.com)
         const hostname = window.location.hostname;
         const protocol = window.location.protocol;
+        const port = window.location.port;
         
         let dominioBase = 'converseia.com'; // Valor padrão
         
@@ -206,8 +207,9 @@ const ScriptInput = () => {
           dominioBase = 'converseia.com';
         } else if (hostname.includes('vercel.app')) {
           dominioBase = hostname; // Para Vercel, usar hostname completo
-        } else if (hostname === 'localhost') {
-          dominioBase = 'localhost:5173'; // Para desenvolvimento local
+        } else if (hostname === 'localhost' || hostname === '127.0.0.1') {
+          // Para desenvolvimento local, incluir a porta atual
+          dominioBase = port ? `localhost:${port}` : 'localhost:5173';
         }
         
         // Gerar URL com subdomínio: cliente1.converseia.com
@@ -361,17 +363,20 @@ const ScriptInput = () => {
                 {clientSlug && (() => {
                   // Detectar domínio base dinamicamente
                   const hostname = window.location.hostname;
+                  const port = window.location.port;
+                  const protocol = window.location.protocol;
                   let dominioBase = 'converseia.com';
                   
                   if (hostname.includes('converseia.com')) {
                     dominioBase = 'converseia.com';
                   } else if (hostname.includes('vercel.app')) {
                     dominioBase = hostname;
-                  } else if (hostname === 'localhost') {
-                    dominioBase = 'localhost:5173';
+                  } else if (hostname === 'localhost' || hostname === '127.0.0.1') {
+                    // Para desenvolvimento local, incluir a porta atual
+                    dominioBase = port ? `localhost:${port}` : 'localhost:5173';
                   }
 
-                  const urlSubdominio = `https://${clientSlug}.${dominioBase}`;
+                  const urlSubdominio = `${protocol}//${clientSlug}.${dominioBase}`;
 
                   return (
                     <div className="text-xs space-y-2 bg-secondary/30 p-3 rounded-md border border-primary/20">

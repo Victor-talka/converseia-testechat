@@ -148,11 +148,37 @@ const ClientsManager = () => {
   };
 
   const handleCopyLink = (scriptId: string) => {
-    const link = `${window.location.origin}/preview/${scriptId}`;
+    // Encontrar o script para pegar o slug do cliente
+    const script = scripts.find(s => s.id === scriptId);
+    if (!script || !script.clientSlug) {
+      toast({
+        title: "Erro",
+        description: "Não foi possível encontrar o slug do cliente",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Detectar domínio base dinamicamente
+    const hostname = window.location.hostname;
+    const protocol = window.location.protocol;
+    const port = window.location.port;
+    let dominioBase = 'converseia.com';
+    
+    if (hostname.includes('converseia.com')) {
+      dominioBase = 'converseia.com';
+    } else if (hostname.includes('vercel.app')) {
+      dominioBase = hostname;
+    } else if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      dominioBase = port ? `localhost:${port}` : 'localhost:5173';
+    }
+
+    const link = `${protocol}//${script.clientSlug}.${dominioBase}`;
+    
     navigator.clipboard.writeText(link).then(() => {
       toast({
         title: "Link copiado!",
-        description: "O link do preview foi copiado para a área de transferência",
+        description: `${link} foi copiado para a área de transferência`,
       });
     }).catch(() => {
       toast({
@@ -246,17 +272,19 @@ const ClientsManager = () => {
                           </div>
                           {client.slug && (() => {
                             const hostname = window.location.hostname;
+                            const protocol = window.location.protocol;
+                            const port = window.location.port;
                             let dominioBase = 'converseia.com';
                             
                             if (hostname.includes('converseia.com')) {
                               dominioBase = 'converseia.com';
                             } else if (hostname.includes('vercel.app')) {
                               dominioBase = hostname;
-                            } else if (hostname === 'localhost') {
-                              dominioBase = 'localhost:5173';
+                            } else if (hostname === 'localhost' || hostname === '127.0.0.1') {
+                              dominioBase = port ? `localhost:${port}` : 'localhost:5173';
                             }
                             
-                            const urlSubdominio = `https://${client.slug}.${dominioBase}`;
+                            const urlSubdominio = `${protocol}//${client.slug}.${dominioBase}`;
                             
                             return (
                               <div className="flex items-center gap-2 mt-1">
@@ -319,17 +347,19 @@ const ClientsManager = () => {
                                 />
                                 {clientForm.slug && (() => {
                                   const hostname = window.location.hostname;
+                                  const protocol = window.location.protocol;
+                                  const port = window.location.port;
                                   let dominioBase = 'converseia.com';
                                   
                                   if (hostname.includes('converseia.com')) {
                                     dominioBase = 'converseia.com';
                                   } else if (hostname.includes('vercel.app')) {
                                     dominioBase = hostname;
-                                  } else if (hostname === 'localhost') {
-                                    dominioBase = 'localhost:5173';
+                                  } else if (hostname === 'localhost' || hostname === '127.0.0.1') {
+                                    dominioBase = port ? `localhost:${port}` : 'localhost:5173';
                                   }
                                   
-                                  const urlSubdominio = `https://${clientForm.slug}.${dominioBase}`;
+                                  const urlSubdominio = `${protocol}//${clientForm.slug}.${dominioBase}`;
                                   
                                   return (
                                     <p className="text-xs text-muted-foreground mt-1">
@@ -462,7 +492,24 @@ const ClientsManager = () => {
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  onClick={() => window.open(`/preview/${script.id}`, '_blank')}
+                                  onClick={() => {
+                                    // Gerar URL com subdomínio
+                                    const hostname = window.location.hostname;
+                                    const protocol = window.location.protocol;
+                                    const port = window.location.port;
+                                    let dominioBase = 'converseia.com';
+                                    
+                                    if (hostname.includes('converseia.com')) {
+                                      dominioBase = 'converseia.com';
+                                    } else if (hostname.includes('vercel.app')) {
+                                      dominioBase = hostname;
+                                    } else if (hostname === 'localhost' || hostname === '127.0.0.1') {
+                                      dominioBase = port ? `localhost:${port}` : 'localhost:5173';
+                                    }
+
+                                    const previewUrl = `${protocol}//${script.clientSlug}.${dominioBase}`;
+                                    window.open(previewUrl, '_blank');
+                                  }}
                                   title="Ver Preview"
                                 >
                                   <Eye className="w-4 h-4" />
